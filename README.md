@@ -316,6 +316,46 @@ Typical design:
   - Merkle root storage
 
 ---
+## Course Structure (Sugestion)
+```json
+{
+  "studentId": "20220001",
+  "name": "Nguyen Van A",
+  "program": "Computer Science",
+  "courses": [
+    {
+      "courseId": "IT1000",
+      "courseName": "Introduction to Programming",
+      "semester": "2023-1",
+      "credits": 4.0,
+      "grade": "A"
+    },
+    {
+      "courseId": "IT2001",
+      "courseName": "Data Structures",
+      "semester": "2023-2",
+      "credits": 3.0,
+      "grade": "B+"
+    },
+    {
+      "courseId": "IT3002",
+      "courseName": "Computer Networks",
+      "semester": "2024-1",
+      "credits": 3.0,
+      "grade": "B+"
+    },
+    {
+      "courseId": "IT4003",
+      "courseName": "Cryptography",
+      "semester": "2024-2",
+      "credits": 3.0,
+      "grade": "A+"
+    }
+  ]
+}
+```
+
+---
 
 ## 📊 Implemented Features
 
@@ -352,9 +392,3 @@ This system provides:
 - Efficient on-chain verification
 - Privacy-preserving data sharing
 - Revocation support for invalid credentials
-
----
-
-## 👨‍💻 Author
-
-Digital Diploma Smart Contract Project
