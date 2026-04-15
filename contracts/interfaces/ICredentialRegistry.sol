@@ -6,5 +6,6 @@ interface ICredentialRegistry {
     function isRevoked(bytes32 credentialId) external view returns (bool);
     function getMerkleRoot(bytes32 credentialId) external view returns (bytes32);
     function getCredentialIssuer(bytes32 credentialId) external view returns (address);
+    function getCredentialDigest(bytes32 credentialId) external view returns (bytes32);
     function credentialExists(bytes32 credentialId) external view returns (bool);
 }
