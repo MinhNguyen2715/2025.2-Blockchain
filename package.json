@@ -4,7 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deployAll.js --network localhost",
+    "demo": "hardhat run scripts/demoFlow.js --network localhost",
+    "demo:merkle": "hardhat run scripts/demoMerkleProof.js --network localhost"
   },
   "keywords": [],
   "author": "",
