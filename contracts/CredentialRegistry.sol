@@ -2,8 +2,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 import "./interfaces/IIssuerRegistry.sol";
+import "./libraries/DiplomaCrypto.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-contract CredentialRegistry {
+contract CredentialRegistry is EIP712 {
+    using ECDSA for bytes32;
+
     struct Credential {
         address issuer;
         address holder;
@@ -32,24 +37,38 @@ contract CredentialRegistry {
         address indexed issuer
     );
 
-    constructor(address issuerRegistryAddress) {
+    constructor(address issuerRegistryAddress) EIP712("CredentialRegistry", "1") {
         require(issuerRegistryAddress != address(0), "Invalid issuer registry");
         issuerRegistry = IIssuerRegistry(issuerRegistryAddress);
     }
 
-    // Allow an authorized university to issue a diploma
+    // Allow a relayer to submit a university-signed diploma issuance payload.
     function issueCredential(
         bytes32 credentialId,
         address holder,
         bytes32 merkleRoot,
-        bytes32 metadataHash
+        bytes32 metadataHash,
+        address issuer,
+        bytes calldata signature
     ) external {
-        require(issuerRegistry.isAuthorizedIssuer(msg.sender), "Not authorized issuer");
+        require(issuer != address(0), "Invalid issuer");
         require(holder != address(0), "Invalid holder");
         require(!credentials[credentialId].exists, "Credential already exists");
 
+        bytes32 digest = _buildCredentialDigest(
+            credentialId,
+            holder,
+            merkleRoot,
+            metadataHash,
+            issuer
+        );
+
+        address recoveredSigner = ECDSA.recoverCalldata(digest, signature);
+        require(recoveredSigner == issuer, "Invalid credential signature");
+        require(issuerRegistry.isAuthorizedIssuer(issuer), "Not authorized issuer");
+
         credentials[credentialId] = Credential({
-            issuer: msg.sender,
+            issuer: issuer,
             holder: holder,
             merkleRoot: merkleRoot,
             metadataHash: metadataHash,
@@ -60,7 +79,7 @@ contract CredentialRegistry {
 
         emit CredentialIssued(
             credentialId,
-            msg.sender,
+            issuer,
             holder,
             merkleRoot,
             metadataHash
@@ -103,7 +122,54 @@ contract CredentialRegistry {
         return credentials[credentialId].metadataHash;
     }
 
+    function getCredentialDigest(bytes32 credentialId) external view returns (bytes32) {
+        require(credentials[credentialId].exists, "Credential not found");
+
+        Credential storage credential = credentials[credentialId];
+        return _buildCredentialDigest(
+            credentialId,
+            credential.holder,
+            credential.merkleRoot,
+            credential.metadataHash,
+            credential.issuer
+        );
+    }
+
+    function hashCredentialPayload(
+        bytes32 credentialId,
+        address holder,
+        bytes32 merkleRoot,
+        bytes32 metadataHash,
+        address issuer
+    ) external view returns (bytes32) {
+        return _buildCredentialDigest(
+            credentialId,
+            holder,
+            merkleRoot,
+            metadataHash,
+            issuer
+        );
+    }
+
     function credentialExists(bytes32 credentialId) external view returns (bool) {
         return credentials[credentialId].exists;
+    }
+
+    function _buildCredentialDigest(
+        bytes32 credentialId,
+        address holder,
+        bytes32 merkleRoot,
+        bytes32 metadataHash,
+        address issuer
+    ) internal view returns (bytes32) {
+        return _hashTypedDataV4(
+            DiplomaCrypto.hashCredentialStruct(
+                credentialId,
+                holder,
+                merkleRoot,
+                metadataHash,
+                issuer
+            )
+        );
     }
 }

@@ -1,11 +1,15 @@
 import { network } from "hardhat";
 import fs from "fs";
+import {
+  getCredentialDigest,
+  signCredentialPayload,
+} from "./utils/diploma.js";
 
 async function main() {
   const { ethers } = await network.connect();
 
   // Lấy các account test từ local Hardhat node
-  const [admin, issuer, holder, verifier] = await ethers.getSigners();
+  const [admin, issuer, holder, relayer] = await ethers.getSigners();
 
   // Địa chỉ contract đã deploy trên localhost
 const deployments = JSON.parse(
@@ -39,12 +43,34 @@ const diplomaVerifierAddress = deployments.DiplomaVerifier;
   console.log("Admin    :", admin.address);
   console.log("Issuer   :", issuer.address);
   console.log("Holder   :", holder.address);
-  console.log("Verifier :", verifier.address);
+  console.log("Relayer  :", relayer.address);
 
-  // Tạo dữ liệu mẫu cho credential
+  const { chainId } = await ethers.provider.getNetwork();
+
+  // Tạo dữ liệu mẫu cho credential payload
   const credentialId = ethers.id("credential-demo-001");
   const merkleRoot = ethers.id("merkle-root-demo-001");
   const metadataHash = ethers.id("metadata-demo-001");
+  const payload = {
+    credentialId,
+    holder: holder.address,
+    merkleRoot,
+    metadataHash,
+    issuer: issuer.address,
+  };
+
+  const signature = await signCredentialPayload(
+    issuer,
+    chainId,
+    await credentialRegistry.getAddress(),
+    payload
+  );
+
+  const expectedDigest = getCredentialDigest(
+    chainId,
+    await credentialRegistry.getAddress(),
+    payload
+  );
 
   console.log("\n--------------------------------------");
   console.log("STEP 1: Admin adds an authorized issuer");
@@ -60,14 +86,23 @@ const diplomaVerifierAddress = deployments.DiplomaVerifier;
   console.log("Issuer authorized =", isIssuerAuthorized);
 
   console.log("\n--------------------------------------");
-  console.log("STEP 2: Issuer issues a credential");
+  console.log("STEP 2: Issuer signs the credential off-chain");
   console.log("--------------------------------------");
 
-  await credentialRegistry.connect(issuer).issueCredential(
+  console.log("Credential digest =", expectedDigest);
+  console.log("Signature         =", signature);
+
+  console.log("\n--------------------------------------");
+  console.log("STEP 3: Relayer submits signed credential on-chain");
+  console.log("--------------------------------------");
+
+  await credentialRegistry.connect(relayer).issueCredential(
     credentialId,
     holder.address,
     merkleRoot,
-    metadataHash
+    metadataHash,
+    issuer.address,
+    signature
   );
 
   const credentialExists = await credentialRegistry.credentialExists(
@@ -82,15 +117,19 @@ const diplomaVerifierAddress = deployments.DiplomaVerifier;
   const storedMerkleRoot = await credentialRegistry.getMerkleRoot(
     credentialId
   );
+  const onchainDigest = await credentialRegistry.getCredentialDigest(
+    credentialId
+  );
 
   console.log("Credential issued successfully");
   console.log("Credential exists =", credentialExists);
   console.log("Stored issuer     =", storedIssuer);
   console.log("Stored holder     =", storedHolder);
   console.log("Stored merkleRoot =", storedMerkleRoot);
+  console.log("On-chain digest   =", onchainDigest);
 
   console.log("\n--------------------------------------");
-  console.log("STEP 3: Verifier checks credential");
+  console.log("STEP 4: Verifier checks credential status and signature");
   console.log("--------------------------------------");
 
   const isCredentialValidBeforeRevoke =
@@ -98,12 +137,17 @@ const diplomaVerifierAddress = deployments.DiplomaVerifier;
 
   const verifierMerkleRoot =
     await diplomaVerifier.getCredentialMerkleRoot(credentialId);
+  const signatureValid = await diplomaVerifier.verifyCredentialSignature(
+    credentialId,
+    signature
+  );
 
   console.log("Credential valid before revoke =", isCredentialValidBeforeRevoke);
+  console.log("Signature valid               =", signatureValid);
   console.log("Merkle root from verifier      =", verifierMerkleRoot);
 
   console.log("\n--------------------------------------");
-  console.log("STEP 4: Issuer revokes credential");
+  console.log("STEP 5: Issuer revokes credential");
   console.log("--------------------------------------");
 
   await credentialRegistry.connect(issuer).revokeCredential(credentialId);
@@ -113,13 +157,16 @@ const diplomaVerifierAddress = deployments.DiplomaVerifier;
   console.log("Credential revoked =", revoked);
 
   console.log("\n--------------------------------------");
-  console.log("STEP 5: Verifier checks again");
+  console.log("STEP 6: Verifier checks again");
   console.log("--------------------------------------");
 
   const isCredentialValidAfterRevoke =
     await diplomaVerifier.verifyCredentialStatus(credentialId);
+  const signatureValidAfterRevoke =
+    await diplomaVerifier.verifyCredentialSignature(credentialId, signature);
 
   console.log("Credential valid after revoke =", isCredentialValidAfterRevoke);
+  console.log("Signature valid after revoke =", signatureValidAfterRevoke);
 
   console.log("\n======================================");
   console.log(" DEMO COMPLETED SUCCESSFULLY");
