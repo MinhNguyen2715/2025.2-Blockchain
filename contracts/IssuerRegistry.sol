@@ -56,7 +56,7 @@ contract IssuerRegistry {
     function isAuthorizedIssuer(address issuer) external view returns (bool) {
         return authorizedIssuers[issuer];
     }
-    
+
     function getIssuerName(address issuer) external view returns (string memory) {
         require(authorizedIssuers[issuer], "Issuer not found");
         return issuerNames[issuer];

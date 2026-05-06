@@ -33,10 +33,7 @@ contract CredentialRegistry is EIP712 {
         uint256 issuedAt
     );
 
-    event CredentialRevoked(
-        bytes32 indexed credentialId,
-        address indexed issuer
-    );
+    event CredentialRevoked(bytes32 indexed credentialId, address indexed issuer);
 
     constructor(address issuerRegistryAddress) EIP712("CredentialRegistry", "1") {
         require(issuerRegistryAddress != address(0), "Invalid issuer registry");
@@ -70,10 +67,7 @@ contract CredentialRegistry is EIP712 {
 
         address recoveredSigner = ECDSA.recoverCalldata(digest, signature);
         require(recoveredSigner == issuer, "Invalid credential signature");
-        require(
-            issuerRegistry.isAuthorizedIssuer(issuer),
-            "Not authorized issuer"
-        );
+        require(issuerRegistry.isAuthorizedIssuer(issuer), "Not authorized issuer");
 
         usedDigests[digest] = true;
 
@@ -101,14 +95,8 @@ contract CredentialRegistry is EIP712 {
 
     function revokeCredential(bytes32 credentialId) external {
         require(credentials[credentialId].exists, "Credential not found");
-        require(
-            credentials[credentialId].issuer == msg.sender,
-            "Not credential issuer"
-        );
-        require(
-            !credentials[credentialId].revoked,
-            "Credential already revoked"
-        );
+        require(credentials[credentialId].issuer == msg.sender, "Not credential issuer");
+        require(!credentials[credentialId].revoked, "Credential already revoked");
 
         credentials[credentialId].revoked = true;
 
@@ -125,30 +113,22 @@ contract CredentialRegistry is EIP712 {
         return credentials[credentialId].merkleRoot;
     }
 
-    function getCredentialIssuer(
-        bytes32 credentialId
-    ) external view returns (address) {
+    function getCredentialIssuer(bytes32 credentialId) external view returns (address) {
         require(credentials[credentialId].exists, "Credential not found");
         return credentials[credentialId].issuer;
     }
 
-    function getCredentialHolder(
-        bytes32 credentialId
-    ) external view returns (address) {
+    function getCredentialHolder(bytes32 credentialId) external view returns (address) {
         require(credentials[credentialId].exists, "Credential not found");
         return credentials[credentialId].holder;
     }
 
-    function getMetadataHash(
-        bytes32 credentialId
-    ) external view returns (bytes32) {
+    function getMetadataHash(bytes32 credentialId) external view returns (bytes32) {
         require(credentials[credentialId].exists, "Credential not found");
         return credentials[credentialId].metadataHash;
     }
 
-    function getCredentialDigest(
-        bytes32 credentialId
-    ) external view returns (bytes32) {
+    function getCredentialDigest(bytes32 credentialId) external view returns (bytes32) {
         require(credentials[credentialId].exists, "Credential not found");
         return credentials[credentialId].digest;
     }
@@ -172,15 +152,7 @@ contract CredentialRegistry is EIP712 {
 
         Credential memory c = credentials[credentialId];
 
-        return (
-            c.issuer,
-            c.holder,
-            c.merkleRoot,
-            c.metadataHash,
-            c.digest,
-            c.revoked,
-            c.issuedAt
-        );
+        return (c.issuer, c.holder, c.merkleRoot, c.metadataHash, c.digest, c.revoked, c.issuedAt);
     }
 
     function hashCredentialPayload(
@@ -190,18 +162,10 @@ contract CredentialRegistry is EIP712 {
         bytes32 metadataHash,
         address issuer
     ) external view returns (bytes32) {
-        return _buildCredentialDigest(
-            credentialId,
-            holder,
-            merkleRoot,
-            metadataHash,
-            issuer
-        );
+        return _buildCredentialDigest(credentialId, holder, merkleRoot, metadataHash, issuer);
     }
 
-    function credentialExists(
-        bytes32 credentialId
-    ) external view returns (bool) {
+    function credentialExists(bytes32 credentialId) external view returns (bool) {
         return credentials[credentialId].exists;
     }
 

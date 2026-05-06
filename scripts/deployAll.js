@@ -20,23 +20,19 @@ async function main() {
   // 2. Deploy CredentialRegistry
   // ========================
   // Truyền vào địa chỉ IssuerRegistry
-  const credentialRegistry = await ethers.deployContract(
-    "CredentialRegistry",
-    [await issuerRegistry.getAddress()]
-  );
+  const credentialRegistry = await ethers.deployContract("CredentialRegistry", [
+    await issuerRegistry.getAddress(),
+  ]);
   await credentialRegistry.waitForDeployment();
 
   // ========================
   // 3. Deploy DiplomaVerifier
   // ========================
   // Truyền vào 2 contract trước
-  const diplomaVerifier = await ethers.deployContract(
-    "DiplomaVerifier",
-    [
-      await issuerRegistry.getAddress(),
-      await credentialRegistry.getAddress(),
-    ]
-  );
+  const diplomaVerifier = await ethers.deployContract("DiplomaVerifier", [
+    await issuerRegistry.getAddress(),
+    await credentialRegistry.getAddress(),
+  ]);
   await diplomaVerifier.waitForDeployment();
 
   // ========================
@@ -47,25 +43,23 @@ async function main() {
   console.log("DiplomaVerifier:", await diplomaVerifier.getAddress());
 
   const deployments = {
-  IssuerRegistry: await issuerRegistry.getAddress(),
-  CredentialRegistry: await credentialRegistry.getAddress(),
-  DiplomaVerifier: await diplomaVerifier.getAddress(),
+    IssuerRegistry: await issuerRegistry.getAddress(),
+    CredentialRegistry: await credentialRegistry.getAddress(),
+    DiplomaVerifier: await diplomaVerifier.getAddress(),
   };
 
   if (!fs.existsSync("./deployments")) {
     fs.mkdirSync("./deployments");
   }
 
-  // write JSON file 
+  // write JSON file
   fs.writeFileSync(
     "./deployments/localhost.json",
-    JSON.stringify(deployments, null, 2)
+    JSON.stringify(deployments, null, 2),
   );
 
   console.log("\nSaved deployment to deployments/localhost.json");
 }
-
-
 
 main().catch((error) => {
   console.error(error);

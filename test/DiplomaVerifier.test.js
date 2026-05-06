@@ -19,14 +19,17 @@ describe("DiplomaVerifier", function () {
 
     await issuerRegistry.addIssuer(issuer1.address, "HUST");
 
-    const CredentialRegistry = await ethers.getContractFactory("CredentialRegistry");
-    const credentialRegistry = await CredentialRegistry.deploy(await issuerRegistry.getAddress());
+    const CredentialRegistry =
+      await ethers.getContractFactory("CredentialRegistry");
+    const credentialRegistry = await CredentialRegistry.deploy(
+      await issuerRegistry.getAddress(),
+    );
     await credentialRegistry.waitForDeployment();
 
     const DiplomaVerifier = await ethers.getContractFactory("DiplomaVerifier");
     const diplomaVerifier = await DiplomaVerifier.deploy(
       await issuerRegistry.getAddress(),
-      await credentialRegistry.getAddress()
+      await credentialRegistry.getAddress(),
     );
     await diplomaVerifier.waitForDeployment();
 
@@ -88,13 +91,13 @@ describe("DiplomaVerifier", function () {
       issuer1,
       chainId,
       await credentialRegistry.getAddress(),
-      payload
+      payload,
     );
     const wrongSignature = await signCredentialPayload(
       other,
       chainId,
       await credentialRegistry.getAddress(),
-      payload
+      payload,
     );
     const targetRecord = transcript[1];
     const targetLeaf = hashTranscriptLeaf(targetRecord);
@@ -109,7 +112,7 @@ describe("DiplomaVerifier", function () {
         merkleRoot,
         metadataHash,
         issuer,
-        signature
+        signature,
       );
 
     return {
@@ -138,9 +141,12 @@ describe("DiplomaVerifier", function () {
   });
 
   it("should return true for valid credential", async function () {
-    const { credentialId, diplomaVerifier } = await issueSignedTranscriptCredential();
+    const { credentialId, diplomaVerifier } =
+      await issueSignedTranscriptCredential();
 
-    expect(await diplomaVerifier.verifyCredentialStatus(credentialId)).to.equal(true);
+    expect(await diplomaVerifier.verifyCredentialStatus(credentialId)).to.equal(
+      true,
+    );
   });
 
   it("should return false for non-existing credential", async function () {
@@ -148,7 +154,9 @@ describe("DiplomaVerifier", function () {
 
     const credentialId = ethers.id("credential-not-found");
 
-    expect(await diplomaVerifier.verifyCredentialStatus(credentialId)).to.equal(false);
+    expect(await diplomaVerifier.verifyCredentialStatus(credentialId)).to.equal(
+      false,
+    );
   });
 
   it("should return false for revoked credential", async function () {
@@ -157,7 +165,9 @@ describe("DiplomaVerifier", function () {
 
     await credentialRegistry.connect(issuer1).revokeCredential(credentialId);
 
-    expect(await diplomaVerifier.verifyCredentialStatus(credentialId)).to.equal(false);
+    expect(await diplomaVerifier.verifyCredentialStatus(credentialId)).to.equal(
+      false,
+    );
   });
 
   it("should return false if issuer is removed after issuing", async function () {
@@ -166,17 +176,23 @@ describe("DiplomaVerifier", function () {
 
     await issuerRegistry.removeIssuer(issuer1.address);
 
-    expect(await diplomaVerifier.verifyCredentialStatus(credentialId)).to.equal(false);
+    expect(await diplomaVerifier.verifyCredentialStatus(credentialId)).to.equal(
+      false,
+    );
   });
 
   it("should return merkle root for valid credential", async function () {
-    const { credentialId, diplomaVerifier, merkleRoot } = await issueSignedTranscriptCredential();
+    const { credentialId, diplomaVerifier, merkleRoot } =
+      await issueSignedTranscriptCredential();
 
-    expect(await diplomaVerifier.getCredentialMerkleRoot(credentialId)).to.equal(merkleRoot);
+    expect(
+      await diplomaVerifier.getCredentialMerkleRoot(credentialId),
+    ).to.equal(merkleRoot);
   });
 
   it("hashes transcript leaves the same way off-chain and on-chain", async function () {
-    const { diplomaVerifier, targetRecord } = await issueSignedTranscriptCredential();
+    const { diplomaVerifier, targetRecord } =
+      await issueSignedTranscriptCredential();
 
     expect(
       await diplomaVerifier.hashTranscriptLeaf(
@@ -184,8 +200,8 @@ describe("DiplomaVerifier", function () {
         targetRecord.courseName,
         targetRecord.semester,
         targetRecord.creditsScaled,
-        targetRecord.grade
-      )
+        targetRecord.grade,
+      ),
     ).to.equal(hashTranscriptLeaf(targetRecord));
   });
 
@@ -194,7 +210,7 @@ describe("DiplomaVerifier", function () {
       await issueSignedTranscriptCredential();
 
     expect(
-      await diplomaVerifier.verifyCredentialSignature(credentialId, signature)
+      await diplomaVerifier.verifyCredentialSignature(credentialId, signature),
     ).to.equal(true);
   });
 
@@ -203,7 +219,10 @@ describe("DiplomaVerifier", function () {
       await issueSignedTranscriptCredential();
 
     expect(
-      await diplomaVerifier.verifyCredentialSignature(credentialId, wrongSignature)
+      await diplomaVerifier.verifyCredentialSignature(
+        credentialId,
+        wrongSignature,
+      ),
     ).to.equal(false);
   });
 
@@ -220,8 +239,8 @@ describe("DiplomaVerifier", function () {
         targetRecord.creditsScaled,
         targetRecord.grade,
         proof,
-        signature
-      )
+        signature,
+      ),
     ).to.equal(true);
   });
 
@@ -238,14 +257,19 @@ describe("DiplomaVerifier", function () {
         targetRecord.creditsScaled,
         "B",
         proof,
-        signature
-      )
+        signature,
+      ),
     ).to.equal(false);
   });
 
   it("returns false when the proof does not match the disclosed transcript leaf", async function () {
-    const { credentialId, diplomaVerifier, targetRecord, wrongProof, signature } =
-      await issueSignedTranscriptCredential();
+    const {
+      credentialId,
+      diplomaVerifier,
+      targetRecord,
+      wrongProof,
+      signature,
+    } = await issueSignedTranscriptCredential();
 
     expect(
       await diplomaVerifier.verifyCredentialPackage(
@@ -256,8 +280,8 @@ describe("DiplomaVerifier", function () {
         targetRecord.creditsScaled,
         targetRecord.grade,
         wrongProof,
-        signature
-      )
+        signature,
+      ),
     ).to.equal(false);
   });
 });

@@ -23,15 +23,19 @@ describe("IssuerRegistry", function () {
 
     await issuerRegistry.addIssuer(issuer1.address, "HUST");
 
-    expect(await issuerRegistry.isAuthorizedIssuer(issuer1.address)).to.equal(true);
-    expect(await issuerRegistry.getIssuerName(issuer1.address)).to.equal("HUST");
+    expect(await issuerRegistry.isAuthorizedIssuer(issuer1.address)).to.equal(
+      true,
+    );
+    expect(await issuerRegistry.getIssuerName(issuer1.address)).to.equal(
+      "HUST",
+    );
   });
 
   it("should not allow non-owner to add issuer", async function () {
     const { issuerRegistry, issuer1, other } = await deployIssuerRegistry();
 
     await expect(
-      issuerRegistry.connect(other).addIssuer(issuer1.address, "HUST")
+      issuerRegistry.connect(other).addIssuer(issuer1.address, "HUST"),
     ).to.be.revertedWith("Not owner");
   });
 
@@ -41,7 +45,9 @@ describe("IssuerRegistry", function () {
     await issuerRegistry.addIssuer(issuer1.address, "HUST");
     await issuerRegistry.removeIssuer(issuer1.address);
 
-    expect(await issuerRegistry.isAuthorizedIssuer(issuer1.address)).to.equal(false);
+    expect(await issuerRegistry.isAuthorizedIssuer(issuer1.address)).to.equal(
+      false,
+    );
   });
 
   it("should transfer ownership", async function () {

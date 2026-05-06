@@ -75,13 +75,8 @@ contract DiplomaVerifier {
         uint32 creditsScaled,
         string memory grade
     ) public pure returns (bytes32) {
-        return DiplomaCrypto.hashTranscriptLeaf(
-            courseId,
-            courseName,
-            semester,
-            creditsScaled,
-            grade
-        );
+        return
+            DiplomaCrypto.hashTranscriptLeaf(courseId, courseName, semester, creditsScaled, grade);
     }
 
     function verifyCredentialSignature(
@@ -94,8 +89,10 @@ contract DiplomaVerifier {
 
         address issuer = credentialRegistry.getCredentialIssuer(credentialId);
         bytes32 digest = credentialRegistry.getCredentialDigest(credentialId);
-        (address recoveredSigner, ECDSA.RecoverError err, ) = ECDSA
-            .tryRecoverCalldata(digest, signature);
+        (address recoveredSigner, ECDSA.RecoverError err, ) = ECDSA.tryRecoverCalldata(
+            digest,
+            signature
+        );
 
         return err == ECDSA.RecoverError.NoError && recoveredSigner == issuer;
     }
@@ -115,13 +112,7 @@ contract DiplomaVerifier {
         }
 
         bytes32 root = credentialRegistry.getMerkleRoot(credentialId);
-        bytes32 leaf = hashTranscriptLeaf(
-            courseId,
-            courseName,
-            semester,
-            creditsScaled,
-            grade
-        );
+        bytes32 leaf = hashTranscriptLeaf(courseId, courseName, semester, creditsScaled, grade);
 
         return verifyMerkleProof(proof, root, leaf);
     }

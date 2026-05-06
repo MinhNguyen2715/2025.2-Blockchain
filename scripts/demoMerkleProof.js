@@ -13,22 +13,22 @@ async function main() {
   const [admin, issuer, holder, relayer] = await ethers.getSigners();
 
   const deployments = JSON.parse(
-    fs.readFileSync("./deployments/localhost.json", "utf-8")
+    fs.readFileSync("./deployments/localhost.json", "utf-8"),
   );
 
   const issuerRegistry = await ethers.getContractAt(
     "IssuerRegistry",
-    deployments.IssuerRegistry
+    deployments.IssuerRegistry,
   );
 
   const credentialRegistry = await ethers.getContractAt(
     "CredentialRegistry",
-    deployments.CredentialRegistry
+    deployments.CredentialRegistry,
   );
 
   const diplomaVerifier = await ethers.getContractAt(
     "DiplomaVerifier",
-    deployments.DiplomaVerifier
+    deployments.DiplomaVerifier,
   );
 
   console.log("======================================");
@@ -97,7 +97,7 @@ async function main() {
   console.log("--------------------------------------");
 
   const isAlreadyAuthorized = await issuerRegistry.isAuthorizedIssuer(
-    issuer.address
+    issuer.address,
   );
 
   if (!isAlreadyAuthorized) {
@@ -109,7 +109,7 @@ async function main() {
 
   console.log(
     "Issuer authorized =",
-    await issuerRegistry.isAuthorizedIssuer(issuer.address)
+    await issuerRegistry.isAuthorizedIssuer(issuer.address),
   );
 
   console.log("\n--------------------------------------");
@@ -129,12 +129,12 @@ async function main() {
     issuer,
     chainId,
     await credentialRegistry.getAddress(),
-    payload
+    payload,
   );
   const digest = getCredentialDigest(
     chainId,
     await credentialRegistry.getAddress(),
-    payload
+    payload,
   );
 
   const exists = await credentialRegistry.credentialExists(credentialId);
@@ -148,7 +148,7 @@ async function main() {
         merkleRoot,
         metadataHash,
         issuer.address,
-        signature
+        signature,
       );
 
     console.log("Credential issued");
@@ -160,7 +160,7 @@ async function main() {
   console.log("Credential signature =", signature);
   console.log(
     "Stored root =",
-    await credentialRegistry.getMerkleRoot(credentialId)
+    await credentialRegistry.getMerkleRoot(credentialId),
   );
 
   console.log("\n--------------------------------------");
@@ -173,7 +173,7 @@ async function main() {
   console.log("Credential valid =", validStatus);
   console.log(
     "Signature valid =",
-    await diplomaVerifier.verifyCredentialSignature(credentialId, signature)
+    await diplomaVerifier.verifyCredentialSignature(credentialId, signature),
   );
 
   console.log("\n--------------------------------------");
@@ -188,7 +188,7 @@ async function main() {
     targetRecord.creditsScaled,
     targetRecord.grade,
     proof,
-    signature
+    signature,
   );
 
   console.log("Credential package valid =", proofValid);
@@ -205,7 +205,7 @@ async function main() {
     targetRecord.creditsScaled,
     "B",
     proof,
-    signature
+    signature,
   );
 
   console.log("Tampered package valid =", wrongPackageValid);
@@ -218,11 +218,11 @@ async function main() {
     relayer,
     chainId,
     await credentialRegistry.getAddress(),
-    payload
+    payload,
   );
   const wrongSignatureValid = await diplomaVerifier.verifyCredentialSignature(
     credentialId,
-    wrongSignature
+    wrongSignature,
   );
 
   console.log("Wrong signature valid =", wrongSignatureValid);

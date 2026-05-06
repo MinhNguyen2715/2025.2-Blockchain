@@ -1,9 +1,6 @@
 import { network } from "hardhat";
 import fs from "fs";
-import {
-  getCredentialDigest,
-  signCredentialPayload,
-} from "./utils/diploma.js";
+import { getCredentialDigest, signCredentialPayload } from "./utils/diploma.js";
 
 async function main() {
   const { ethers } = await network.connect();
@@ -12,28 +9,28 @@ async function main() {
   const [admin, issuer, holder, relayer] = await ethers.getSigners();
 
   // Địa chỉ contract đã deploy trên localhost
-const deployments = JSON.parse(
-  fs.readFileSync("./deployments/localhost.json", "utf-8")
-);
+  const deployments = JSON.parse(
+    fs.readFileSync("./deployments/localhost.json", "utf-8"),
+  );
 
-const issuerRegistryAddress = deployments.IssuerRegistry;
-const credentialRegistryAddress = deployments.CredentialRegistry;
-const diplomaVerifierAddress = deployments.DiplomaVerifier;
+  const issuerRegistryAddress = deployments.IssuerRegistry;
+  const credentialRegistryAddress = deployments.CredentialRegistry;
+  const diplomaVerifierAddress = deployments.DiplomaVerifier;
 
   // Kết nối tới contract đã deploy
   const issuerRegistry = await ethers.getContractAt(
     "IssuerRegistry",
-    issuerRegistryAddress
+    issuerRegistryAddress,
   );
 
   const credentialRegistry = await ethers.getContractAt(
     "CredentialRegistry",
-    credentialRegistryAddress
+    credentialRegistryAddress,
   );
 
   const diplomaVerifier = await ethers.getContractAt(
     "DiplomaVerifier",
-    diplomaVerifierAddress
+    diplomaVerifierAddress,
   );
 
   console.log("======================================");
@@ -63,13 +60,13 @@ const diplomaVerifierAddress = deployments.DiplomaVerifier;
     issuer,
     chainId,
     await credentialRegistry.getAddress(),
-    payload
+    payload,
   );
 
   const expectedDigest = getCredentialDigest(
     chainId,
     await credentialRegistry.getAddress(),
-    payload
+    payload,
   );
 
   console.log("\n--------------------------------------");
@@ -79,7 +76,7 @@ const diplomaVerifierAddress = deployments.DiplomaVerifier;
   await issuerRegistry.connect(admin).addIssuer(issuer.address, "HUST");
 
   const isIssuerAuthorized = await issuerRegistry.isAuthorizedIssuer(
-    issuer.address
+    issuer.address,
   );
 
   console.log("Issuer added:", issuer.address);
@@ -96,30 +93,26 @@ const diplomaVerifierAddress = deployments.DiplomaVerifier;
   console.log("STEP 3: Relayer submits signed credential on-chain");
   console.log("--------------------------------------");
 
-  await credentialRegistry.connect(relayer).issueCredential(
-    credentialId,
-    holder.address,
-    merkleRoot,
-    metadataHash,
-    issuer.address,
-    signature
-  );
+  await credentialRegistry
+    .connect(relayer)
+    .issueCredential(
+      credentialId,
+      holder.address,
+      merkleRoot,
+      metadataHash,
+      issuer.address,
+      signature,
+    );
 
-  const credentialExists = await credentialRegistry.credentialExists(
-    credentialId
-  );
-  const storedIssuer = await credentialRegistry.getCredentialIssuer(
-    credentialId
-  );
-  const storedHolder = await credentialRegistry.getCredentialHolder(
-    credentialId
-  );
-  const storedMerkleRoot = await credentialRegistry.getMerkleRoot(
-    credentialId
-  );
-  const onchainDigest = await credentialRegistry.getCredentialDigest(
-    credentialId
-  );
+  const credentialExists =
+    await credentialRegistry.credentialExists(credentialId);
+  const storedIssuer =
+    await credentialRegistry.getCredentialIssuer(credentialId);
+  const storedHolder =
+    await credentialRegistry.getCredentialHolder(credentialId);
+  const storedMerkleRoot = await credentialRegistry.getMerkleRoot(credentialId);
+  const onchainDigest =
+    await credentialRegistry.getCredentialDigest(credentialId);
 
   console.log("Credential issued successfully");
   console.log("Credential exists =", credentialExists);
@@ -139,10 +132,13 @@ const diplomaVerifierAddress = deployments.DiplomaVerifier;
     await diplomaVerifier.getCredentialMerkleRoot(credentialId);
   const signatureValid = await diplomaVerifier.verifyCredentialSignature(
     credentialId,
-    signature
+    signature,
   );
 
-  console.log("Credential valid before revoke =", isCredentialValidBeforeRevoke);
+  console.log(
+    "Credential valid before revoke =",
+    isCredentialValidBeforeRevoke,
+  );
   console.log("Signature valid               =", signatureValid);
   console.log("Merkle root from verifier      =", verifierMerkleRoot);
 

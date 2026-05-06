@@ -20,7 +20,7 @@ export const DIPLOMA_TYPES = {
 };
 
 export const TRANSCRIPT_LEAF_TYPEHASH = ethers.id(
-  "TranscriptLeaf(string courseId,string courseName,string semester,uint32 creditsScaled,string grade)"
+  "TranscriptLeaf(string courseId,string courseName,string semester,uint32 creditsScaled,string grade)",
 );
 
 export function buildDiplomaDomain(chainId, verifyingContract) {
@@ -35,7 +35,7 @@ export function getCredentialDigest(chainId, verifyingContract, payload) {
   return TypedDataEncoder.hash(
     buildDiplomaDomain(chainId, verifyingContract),
     DIPLOMA_TYPES,
-    payload
+    payload,
   );
 }
 
@@ -43,12 +43,12 @@ export async function signCredentialPayload(
   signer,
   chainId,
   verifyingContract,
-  payload
+  payload,
 ) {
   return signer.signTypedData(
     buildDiplomaDomain(chainId, verifyingContract),
     DIPLOMA_TYPES,
-    payload
+    payload,
   );
 }
 
@@ -63,8 +63,8 @@ export function hashTranscriptLeaf(record) {
         ethers.keccak256(ethers.toUtf8Bytes(record.semester)),
         record.creditsScaled,
         ethers.keccak256(ethers.toUtf8Bytes(record.grade)),
-      ]
-    )
+      ],
+    ),
   );
 }
 
