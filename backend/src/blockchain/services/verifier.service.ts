@@ -1,0 +1,44 @@
+import { Injectable } from '@nestjs/common';
+import { ContractService } from './contract.service';
+
+@Injectable()
+export class VerifierService {
+  constructor(private contractService: ContractService) {}
+
+  async verifyCredentialStatus(credentialId: string): Promise<boolean> {
+    return this.contractService.diplomaVerifier.verifyCredentialStatus(credentialId);
+  }
+
+  async verifyCredentialSignature(credentialId: string, signature: string): Promise<boolean> {
+    return this.contractService.diplomaVerifier.verifyCredentialSignature(
+      credentialId,
+      signature,
+    );
+  }
+
+  async verifyCredentialPackage(
+    credentialId: string,
+    courseId: string,
+    courseName: string,
+    semester: string,
+    creditsScaled: number,
+    grade: string,
+    proof: string[],
+    signature: string,
+  ): Promise<boolean> {
+    return this.contractService.diplomaVerifier.verifyCredentialPackage(
+      credentialId,
+      courseId,
+      courseName,
+      semester,
+      creditsScaled,
+      grade,
+      proof,
+      signature,
+    );
+  }
+
+  async getCredentialMerkleRoot(credentialId: string): Promise<string> {
+    return this.contractService.diplomaVerifier.getCredentialMerkleRoot(credentialId);
+  }
+}

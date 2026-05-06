@@ -1,8 +1,8 @@
 # Node modules
-/node_modules
+**/node_modules
 
 # Compilation output
-/dist
+**/dist
 
 # pnpm deploy output
 /bundle
@@ -23,6 +23,8 @@
 .env
 .env.local
 .env.*.local
+
+**/.env
 
 # Logs
 npm-debug.log*
