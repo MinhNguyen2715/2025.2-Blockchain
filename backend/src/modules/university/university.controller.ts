@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UniversityService } from './university.service';
 import { IssueCredentialDto } from './dto/issue-credential.dto';
 import { RevokeCredentialDto, AddIssuerDto } from './dto/revoke-credential.dto';
-import { AdminApiKeyGuard } from 'src/shared/guards/admin-api-key.guard';
+import { AdminApiKeyGuard } from '../../shared/guards/admin-api-key.guard';
 
 @ApiTags('university')
 @Controller('university')

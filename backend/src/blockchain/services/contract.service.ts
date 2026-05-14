@@ -9,9 +9,9 @@ export class ContractService implements OnModuleInit {
   private provider: ethers.JsonRpcProvider;
   private adminWallet: Wallet;
 
-  issuerRegistry: any;
-  credentialRegistry: any;
-  diplomaVerifier: any;
+  private issuerRegistry: Contract;
+  private credentialRegistry: Contract;
+  private diplomaVerifier: Contract;
 
   constructor(private configService: ConfigService) {
     this.provider = new ethers.JsonRpcProvider(
@@ -55,33 +55,8 @@ export class ContractService implements OnModuleInit {
     }
 
     this.adminWallet = new ethers.Wallet(key, this.provider);
-
-    if (privateKey && privateKey !== '0x...' && privateKey.length > 0) {
-      try {
-        // Clean the key - ethers v6 Wallet constructor needs proper format
-        let key = privateKey.trim();
-        
-        // Remove 0x prefix if present
-        if (key.startsWith('0x')) {
-          key = key.substring(2);
-        }
-        
-        // Validate: should be valid 64-character hex (32 bytes)
-        const validHex = /^[0-9a-fA-F]{64}$/;
-        if (!validHex.test(key)) {
-          console.error('Invalid private key format - must be 64 hex characters');
-          return;
-        }
-        
-        this.adminWallet = new ethers.Wallet(key, this.provider);
-        console.log('Wallet loaded:', this.adminWallet.address);
-      } catch (e) {
-        console.error('Failed to load wallet:', e);
-      }
-    } else {
-      console.log('No private key configured');
-    }
-
+    console.log('Wallet loaded:', this.adminWallet.address);
+    
     const issuerRegistryAddress = this.configService.get('ISSUER_REGISTRY_ADDRESS');
     const credentialRegistryAddress = this.configService.get('CREDENTIAL_REGISTRY_ADDRESS');
     const diplomaVerifierAddress = this.configService.get('DIPLOMA_VERIFIER_ADDRESS');

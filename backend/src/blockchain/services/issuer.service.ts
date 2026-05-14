@@ -11,7 +11,8 @@ export class IssuerService {
 
   async addIssuer(address: string, name: string): Promise<void> {
     const wallet = this.contractService.getWallet();
-    const tx = await this.contractService.getIssuerRegistry()
+    const tx = await this.contractService
+      .getIssuerRegistry()
       .connect(wallet)
       .addIssuer(address, name);
     await tx.wait();

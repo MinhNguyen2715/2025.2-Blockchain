@@ -31,9 +31,10 @@ export class StudentService {
   
   async registerStudent(dto: RegisterStudentDto) {
     const { walletAddress, name, studentId } = dto;
+    const normalizedWallet = this.normalizeAddress(walletAddress);
 
     const existingUser = await this.userRepository.findOne({
-      where: { walletAddress },
+      where: { walletAddress: normalizedWallet },
     });
 
     if (existingUser) {
@@ -41,7 +42,7 @@ export class StudentService {
     }
     
     const user = this.userRepository.create({
-      walletAddress: this.normalizeAddress(walletAddress),
+      walletAddress: normalizedWallet,
       role: UserRole.STUDENT,
       name,
       studentId,
@@ -52,8 +53,9 @@ export class StudentService {
   }
 
   async getCredentials(walletAddress: string) {
+    const normalizedWallet = this.normalizeAddress(walletAddress);
     const credentials = await this.credentialRepository.find({
-      where: { holderAddress: this.normalizeAddress(walletAddress) },
+      where: { holderAddress: normalizedWallet },
     });
 
     return credentials;
@@ -61,6 +63,7 @@ export class StudentService {
 
   async generateProof(dto: GenerateProofDto) {
     const { credentialId, courseIds, holderAddress } = dto;
+    const normalizedHolderAddress = this.normalizeAddress(holderAddress);
 
     const transcript = await this.transcriptRepository.findOne({
       where: { credentialId },
@@ -82,7 +85,7 @@ export class StudentService {
 
     if (
       ethers.getAddress(credential.holderAddress) !==
-      ethers.getAddress(holderAddress)
+      ethers.getAddress(normalizedHolderAddress)
     ) {
       throw new ForbiddenException('Only the credential holder can generate proof');
     }

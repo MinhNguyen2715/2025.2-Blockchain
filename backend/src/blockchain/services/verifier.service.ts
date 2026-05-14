@@ -6,11 +6,13 @@ export class VerifierService {
   constructor(private contractService: ContractService) {}
 
   async verifyCredentialStatus(credentialId: string): Promise<boolean> {
-    return this.contractService.diplomaVerifier.verifyCredentialStatus(credentialId);
+    return this.contractService
+      .getDiplomaVerifier()
+      .verifyCredentialStatus(credentialId);
   }
 
   async verifyCredentialSignature(credentialId: string, signature: string): Promise<boolean> {
-    return this.contractService.diplomaVerifier.verifyCredentialSignature(
+    return this.contractService.getDiplomaVerifier().verifyCredentialSignature(
       credentialId,
       signature,
     );

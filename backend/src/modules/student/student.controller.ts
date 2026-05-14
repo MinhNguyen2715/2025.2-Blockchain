@@ -2,7 +2,6 @@ import { Controller, Post, Get, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { StudentService } from './student.service';
 import { RegisterStudentDto } from './dto/register-student.dto';
-import { UploadTranscriptDto } from './dto/upload-transcript.dto';
 import { GenerateProofDto } from './dto/generate-proof.dto';
 
 @ApiTags('student')

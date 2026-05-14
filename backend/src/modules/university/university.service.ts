@@ -59,7 +59,7 @@ export class UniversityService {
     }
 
     const isAuthorized = 
-      await this.issuerService.isAuthorizedIssuer(issuerAddress);
+      await this.issuerService.isAuthorizedIssuer(normalizedIssuer);
 
     if (!isAuthorized) {
       throw new BadRequestException('Issuer not authorized');
@@ -73,8 +73,7 @@ export class UniversityService {
 
     const provider = this.contractService.getProvider();
     const chainId = Number((await provider.getNetwork()).chainId);
-    const contractAddress =
-      await this.contractService.credentialRegistry.getAddress();
+    const contractAddress = await this.contractService.getCredentialRegistry().getAddress();
 
     const payload = {
       credentialId,
@@ -99,22 +98,6 @@ export class UniversityService {
       normalizedIssuer,
       signature,
     );
-
-    const credential = this.credentialRepository.create({
-      credentialId,
-      holderAddress: normalizedHolder,
-      issuerAddress: normalizedIssuer,
-      merkleRoot,
-      metadataHash,
-      signature,
-    });
-
-    const transcriptRecord = this.transcriptRepository.create({
-      credentialId,
-      courses: transcript,
-      studentId,
-      studentName,
-    });
 
     await this.dataSource.transaction(async (manager) => {
     const credential = manager.create(Credential, {
