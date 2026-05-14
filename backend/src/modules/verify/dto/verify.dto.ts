@@ -1,4 +1,9 @@
-import { IsString, IsArray, IsNumber, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsArray,
+  IsNumber,
+  IsNotEmpty,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class VerifyFullDto {
@@ -33,6 +38,7 @@ export class VerifyFullDto {
 
   @ApiProperty({ type: [String] })
   @IsArray()
+  @IsString({ each: true })
   @IsNotEmpty()
   proof: string[];
 

@@ -6,11 +6,6 @@ export class RevokeCredentialDto {
   @IsString()
   @IsNotEmpty()
   credentialId: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  issuerAddress: string;
 }
 
 export class AddIssuerDto {

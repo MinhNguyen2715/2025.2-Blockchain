@@ -19,20 +19,43 @@ export class ContractService implements OnModuleInit {
     );
   }
 
-  private loadAbi(contractName: string): any[] {
-    const artifactsPath = path.join(
+  private loadAbi(solFile: string, contractName: string): any[] {
+    const artifactsPath = path.resolve(
       process.cwd(),
+      '..',
       'artifacts',
       'contracts',
-      contractName,
+      solFile,
       `${contractName}.json`,
     );
+
+    if (!fs.existsSync(artifactsPath)) {
+      throw new Error(`Artifact not found: ${artifactsPath}`);
+    }
+
     const abiData = JSON.parse(fs.readFileSync(artifactsPath, 'utf-8'));
     return abiData.abi;
   }
 
   async onModuleInit() {
-    const privateKey = this.configService.get('UNIVERSITY_PRIVATE_KEY');
+    const privateKey = this.configService.get<string>('UNIVERSITY_PRIVATE_KEY');
+
+    if (!privateKey) {
+      throw new Error('UNIVERSITY_PRIVATE_KEY is missing in .env');
+    }
+
+    let key = privateKey.trim();
+
+    if (!key.startsWith('0x')) {
+      key = `0x${key}`;
+    }
+
+    if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
+      throw new Error('Invalid UNIVERSITY_PRIVATE_KEY format');
+    }
+
+    this.adminWallet = new ethers.Wallet(key, this.provider);
+
     if (privateKey && privateKey !== '0x...' && privateKey.length > 0) {
       try {
         // Clean the key - ethers v6 Wallet constructor needs proper format
@@ -66,7 +89,7 @@ export class ContractService implements OnModuleInit {
     if (issuerRegistryAddress) {
       this.issuerRegistry = new Contract(
         issuerRegistryAddress,
-        this.loadAbi('IssuerRegistry.sol'),
+        this.loadAbi('IssuerRegistry.sol', 'IssuerRegistry'),
         this.provider,
       );
     }
@@ -74,7 +97,7 @@ export class ContractService implements OnModuleInit {
     if (credentialRegistryAddress) {
       this.credentialRegistry = new Contract(
         credentialRegistryAddress,
-        this.loadAbi('CredentialRegistry.sol'),
+        this.loadAbi('CredentialRegistry.sol', 'CredentialRegistry'),
         this.provider,
       );
     }
@@ -82,17 +105,49 @@ export class ContractService implements OnModuleInit {
     if (diplomaVerifierAddress) {
       this.diplomaVerifier = new Contract(
         diplomaVerifierAddress,
-        this.loadAbi('DiplomaVerifier.sol'),
+        this.loadAbi('DiplomaVerifier.sol', 'DiplomaVerifier'),
         this.provider,
       );
     }
   }
 
-  getProvider(): ethers.JsonRpcProvider {
+  getIssuerRegistry() {
+  if (!this.issuerRegistry) {
+    throw new Error('IssuerRegistry contract is not initialized');
+  }
+
+  return this.issuerRegistry;
+}
+
+  getCredentialRegistry() {
+    if (!this.credentialRegistry) {
+      throw new Error('CredentialRegistry contract is not initialized');
+    }
+
+    return this.credentialRegistry;
+  }
+
+  getDiplomaVerifier() {
+    if (!this.diplomaVerifier) {
+      throw new Error('DiplomaVerifier contract is not initialized');
+    }
+
+    return this.diplomaVerifier;
+  }
+
+  getProvider() {
+    if (!this.provider) {
+      throw new Error('Blockchain provider is not initialized');
+    }
+
     return this.provider;
   }
 
-  getWallet(): Wallet {
+  getWallet() {
+    if (!this.adminWallet) {
+      throw new Error('Admin wallet is not initialized');
+    }
+
     return this.adminWallet;
   }
 }

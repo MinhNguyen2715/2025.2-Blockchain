@@ -26,7 +26,7 @@ export class VerifierService {
     proof: string[],
     signature: string,
   ): Promise<boolean> {
-    return this.contractService.diplomaVerifier.verifyCredentialPackage(
+    return this.contractService.getDiplomaVerifier().verifyCredentialPackage(
       credentialId,
       courseId,
       courseName,
@@ -39,6 +39,6 @@ export class VerifierService {
   }
 
   async getCredentialMerkleRoot(credentialId: string): Promise<string> {
-    return this.contractService.diplomaVerifier.getCredentialMerkleRoot(credentialId);
+    return this.contractService.getDiplomaVerifier().getCredentialMerkleRoot(credentialId);
   }
 }

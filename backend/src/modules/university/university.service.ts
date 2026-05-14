@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ethers } from 'ethers';
 import { ContractService } from '../../blockchain/services/contract.service';
 import { IssuerService } from '../../blockchain/services/issuer.service';
@@ -25,59 +25,89 @@ export class UniversityService {
     private issuerService: IssuerService,
     private credentialService: CredentialService,
     private diplomaUtils: DiplomaUtils,
+    private readonly dataSource: DataSource,
   ) {}
+  private normalizeAddress(address: string): string {
+    if (!ethers.isAddress(address)) {
+      throw new BadRequestException(`Invalid Ethereum address: ${address}`);
+    }
 
+    return ethers.getAddress(address);
+  }
   async issueCredential(dto: IssueCredentialDto) {
-    const { holderAddress, studentId, studentName, transcript, issuerWallet } = dto;
+    const {
+      holderAddress,
+      studentId,
+      studentName,
+      transcript,
+      issuerAddress,
+    } = dto;
 
-    const isAuthorized = await this.issuerService.isAuthorizedIssuer(issuerWallet);
+    const normalizedIssuer = this.normalizeAddress(issuerAddress);
+    const normalizedHolder = this.normalizeAddress(holderAddress);
+
+    const wallet = this.contractService.getWallet();
+
+    if (!wallet) {
+      throw new BadRequestException('Backend signer wallet is not configured');
+    }
+
+    if (ethers.getAddress(wallet.address) !== normalizedIssuer) {
+      throw new BadRequestException(
+        'issuerAddress does not match backend signer wallet',
+      );
+    }
+
+    const isAuthorized = 
+      await this.issuerService.isAuthorizedIssuer(issuerAddress);
+
     if (!isAuthorized) {
       throw new BadRequestException('Issuer not authorized');
     }
 
-    const { tree, root: merkleRoot } = this.diplomaUtils.buildTranscriptMerkleTree(transcript);
+    const { root: merkleRoot } =
+      this.diplomaUtils.buildTranscriptMerkleTree(transcript);
 
     const credentialId = ethers.id(`credential-${studentId}-${Date.now()}`);
     const metadataHash = ethers.id(`metadata-${studentId}`);
 
+    const provider = this.contractService.getProvider();
+    const chainId = Number((await provider.getNetwork()).chainId);
+    const contractAddress =
+      await this.contractService.credentialRegistry.getAddress();
+
     const payload = {
       credentialId,
-      holder: holderAddress,
+      holder: normalizedHolder,
       merkleRoot,
       metadataHash,
-      issuer: issuerWallet,
-    } as Record<string, unknown>;
-
-    const provider = this.contractService.getProvider();
-    const wallet = new ethers.Wallet(issuerWallet, provider);
-    const chainId = (await provider.getNetwork()).chainId;
-    const contractAddress = await this.contractService.credentialRegistry.getAddress();
+      issuer: normalizedIssuer,
+    };
 
     const signature = await this.diplomaUtils.signCredentialPayload(
       wallet,
-      Number(chainId),
+      chainId,
       contractAddress,
       payload,
     );
 
-    await this.credentialService.issueCredential(
+    const txHash = await this.credentialService.issueCredential(
       credentialId,
-      holderAddress,
+      normalizedHolder,
       merkleRoot,
       metadataHash,
-      issuerWallet,
+      normalizedIssuer,
       signature,
     );
 
     const credential = this.credentialRepository.create({
       credentialId,
-      holderAddress,
-      issuerAddress: issuerWallet,
+      holderAddress: normalizedHolder,
+      issuerAddress: normalizedIssuer,
       merkleRoot,
       metadataHash,
       signature,
     });
-    await this.credentialRepository.save(credential);
 
     const transcriptRecord = this.transcriptRepository.create({
       credentialId,
@@ -85,18 +115,40 @@ export class UniversityService {
       studentId,
       studentName,
     });
-    await this.transcriptRepository.save(transcriptRecord);
+
+    await this.dataSource.transaction(async (manager) => {
+    const credential = manager.create(Credential, {
+      credentialId,
+      holderAddress: normalizedHolder,
+      issuerAddress: normalizedIssuer,
+      merkleRoot,
+      metadataHash,
+      signature,
+    });
+
+    await manager.save(credential);
+
+    const transcriptRecord = manager.create(Transcript, {
+      credentialId,
+      courses: transcript,
+      studentId,
+      studentName,
+    });
+
+    await manager.save(transcriptRecord);
+  });
 
     return {
       credentialId,
       merkleRoot,
       signature,
+      txHash,
     };
   }
 
   async revokeCredential(dto: RevokeCredentialDto) {
-    const { credentialId, issuerAddress } = dto;
-    await this.credentialService.revokeCredential(credentialId, issuerAddress);
+    const { credentialId } = dto;
+    await this.credentialService.revokeCredential(credentialId);
 
     await this.credentialRepository.update(
       { credentialId },

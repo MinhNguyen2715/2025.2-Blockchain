@@ -33,7 +33,7 @@ export class IssueCredentialDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  issuerWallet: string;
+  issuerAddress: string;
 
   @ApiProperty()
   @IsString()

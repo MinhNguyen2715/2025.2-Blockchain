@@ -24,7 +24,7 @@ import { Transcript } from './database/entities/transcript.entity';
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'diploma',
       entities: [User, Credential, Transcript],
-      synchronize: true,
+      synchronize: process.env.NODE_ENV !== 'production',
     }),
     SharedModule,
     BlockchainModule,

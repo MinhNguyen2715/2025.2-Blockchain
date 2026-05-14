@@ -7,8 +7,14 @@ export class GenerateProofDto {
   @IsNotEmpty()
   credentialId: string;
 
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  holderAddress: string;
+
   @ApiProperty({ type: [String] })
   @IsArray()
+  @IsString({ each: true })
   @IsNotEmpty()
   courseIds: string[];
 }

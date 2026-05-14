@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ContractService } from './contract.service';
 
 @Injectable()
@@ -12,38 +12,54 @@ export class CredentialService {
     metadataHash: string,
     issuerAddress: string,
     signature: string,
-  ): Promise<void> {
-    const wallet = this.contractService.getWallet();
-    const contract = this.contractService.credentialRegistry.connect(wallet);
+  ): Promise<string> {
+    try {
+      const wallet = this.contractService.getWallet();
+      const contract = this.contractService.getCredentialRegistry().connect(wallet);
 
-    const tx = await contract.issueCredential(
-      credentialId,
-      holderAddress,
-      merkleRoot,
-      metadataHash,
-      issuerAddress,
-      signature,
-    );
-    await tx.wait();
+      const tx = await contract.issueCredential(
+        credentialId,
+        holderAddress,
+        merkleRoot,
+        metadataHash,
+        issuerAddress,
+        signature,
+      );
+
+      const receipt = await tx.wait();
+      return receipt.hash;
+    } catch (error: any) {
+      throw new BadRequestException(
+        `Blockchain issueCredential failed: ${error?.reason || error?.message || String(error)}`,
+      );
+    }
   }
 
-  async revokeCredential(credentialId: string, issuerAddress: string): Promise<void> {
-    const wallet = this.contractService.getWallet();
-    const contract = this.contractService.credentialRegistry.connect(wallet);
+  async revokeCredential(credentialId: string): Promise<string> {
+    try {
+      const wallet = this.contractService.getWallet();
+      const contract = this.contractService.getCredentialRegistry().connect(wallet);
 
-    const tx = await contract.revokeCredential(credentialId);
-    await tx.wait();
+      const tx = await contract.revokeCredential(credentialId);
+      const receipt = await tx.wait();
+
+      return receipt.hash;
+    } catch (error: any) {
+      throw new BadRequestException(
+        `Blockchain revokeCredential failed: ${error?.reason || error?.message || String(error)}`,
+      );
+    }
   }
 
   async getMerkleRoot(credentialId: string): Promise<string> {
-    return this.contractService.credentialRegistry.getMerkleRoot(credentialId);
+    return this.contractService.getCredentialRegistry().getMerkleRoot(credentialId);
   }
 
   async credentialExists(credentialId: string): Promise<boolean> {
-    return this.contractService.credentialRegistry.credentialExists(credentialId);
+    return this.contractService.getCredentialRegistry().credentialExists(credentialId);
   }
 
   async isRevoked(credentialId: string): Promise<boolean> {
-    return this.contractService.credentialRegistry.isRevoked(credentialId);
+    return this.contractService.getCredentialRegistry().isRevoked(credentialId);
   }
 }

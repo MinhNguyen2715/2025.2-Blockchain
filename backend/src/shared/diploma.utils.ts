@@ -100,12 +100,22 @@ export class DiplomaUtils {
 
   getMerkleProof(
     tree: MerkleTree,
-    transcript: Array<{ courseId: string; courseName: string; semester: string; creditsScaled: number; grade: string }>,
+    transcript: Array<{
+      courseId: string;
+      courseName: string;
+      semester: string;
+      creditsScaled: number;
+      grade: string;
+    }>,
     targetCourseId: string,
   ): string[] {
-    const leaf = this.hashTranscriptLeaf(
-      transcript.find((c) => c.courseId === targetCourseId)!,
-    );
+    const course = transcript.find((c) => c.courseId === targetCourseId);
+
+    if (!course) {
+      throw new Error(`Course not found: ${targetCourseId}`);
+    }
+
+    const leaf = this.hashTranscriptLeaf(course);
     return tree.getHexProof(leaf);
   }
 }

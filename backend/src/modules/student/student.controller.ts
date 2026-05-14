@@ -17,13 +17,6 @@ export class StudentController {
     return this.studentService.registerStudent(dto);
   }
 
-  @Post('transcript')
-  @ApiOperation({ summary: 'Upload transcript for a credential' })
-  @ApiResponse({ status: 201, description: 'Transcript uploaded' })
-  async uploadTranscript(@Body() dto: UploadTranscriptDto) {
-    return this.studentService.uploadTranscript(dto);
-  }
-
   @Get('credentials/:walletAddress')
   @ApiOperation({ summary: 'Get all credentials for a student' })
   @ApiResponse({ status: 200, description: 'Credentials found' })
