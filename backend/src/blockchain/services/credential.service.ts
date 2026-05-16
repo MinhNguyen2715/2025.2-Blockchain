@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Contract } from 'ethers';
 import { ContractService } from './contract.service';
 
 @Injectable()
@@ -15,7 +16,11 @@ export class CredentialService {
   ): Promise<string> {
     try {
       const wallet = this.contractService.getWallet();
-      const contract = this.contractService.getCredentialRegistry().connect(wallet);
+      // ethers v6: BaseContract.connect() loses the string-indexer Proxy typing
+      // that Contract has, so cast it back so TS lets us call dynamic methods.
+      const contract = this.contractService
+        .getCredentialRegistry()
+        .connect(wallet) as Contract;
 
       const tx = await contract.issueCredential(
         credentialId,
@@ -38,7 +43,9 @@ export class CredentialService {
   async revokeCredential(credentialId: string): Promise<string> {
     try {
       const wallet = this.contractService.getWallet();
-      const contract = this.contractService.getCredentialRegistry().connect(wallet);
+      const contract = this.contractService
+        .getCredentialRegistry()
+        .connect(wallet) as Contract;
 
       const tx = await contract.revokeCredential(credentialId);
       const receipt = await tx.wait();
