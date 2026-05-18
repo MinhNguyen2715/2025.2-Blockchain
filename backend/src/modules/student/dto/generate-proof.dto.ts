@@ -1,4 +1,10 @@
-import { IsString, IsArray, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class GenerateProofDto {
@@ -17,4 +23,9 @@ export class GenerateProofDto {
   @IsString({ each: true })
   @IsNotEmpty()
   courseIds: string[];
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  includeDegree?: boolean;
 }

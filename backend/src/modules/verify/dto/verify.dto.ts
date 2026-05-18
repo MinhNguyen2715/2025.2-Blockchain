@@ -47,3 +47,36 @@ export class VerifyFullDto {
   @IsNotEmpty()
   signature: string;
 }
+
+export class VerifyDegreeDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  credentialId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  degreeName: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  major: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  graduationYear: string;
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty()
+  proof: string[];
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  signature: string;
+}

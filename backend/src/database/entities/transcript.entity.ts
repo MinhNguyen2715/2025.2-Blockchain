@@ -21,6 +21,13 @@ export class Transcript {
   credential: Credential;
 
   @Column({ type: 'jsonb' })
+  degree: {
+    degreeName: string;
+    major: string;
+    graduationYear: string;
+  };
+
+  @Column({ type: 'jsonb' })
   courses: {
     courseId: string;
     courseName: string;

@@ -39,6 +39,7 @@ export class UniversityService {
       holderAddress,
       studentId,
       studentName,
+      degree,
       transcript,
       issuerAddress,
     } = dto;
@@ -66,7 +67,7 @@ export class UniversityService {
     }
 
     const { root: merkleRoot } =
-      this.diplomaUtils.buildTranscriptMerkleTree(transcript);
+        this.diplomaUtils.buildCredentialMerkleTree(degree, transcript);
 
     const credentialId = ethers.id(`credential-${studentId}-${Date.now()}`);
     const metadataHash = ethers.id(`metadata-${studentId}`);
@@ -113,6 +114,7 @@ export class UniversityService {
 
     const transcriptRecord = manager.create(Transcript, {
       credentialId,
+      degree,
       courses: transcript,
       studentId,
       studentName,

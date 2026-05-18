@@ -24,6 +24,23 @@ export class CourseDto {
   grade: string;
 }
 
+export class DegreeDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  degreeName: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  major: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  graduationYear: string;
+}
+
 export class IssueCredentialDto {
   @ApiProperty()
   @IsString()
@@ -44,6 +61,11 @@ export class IssueCredentialDto {
   @IsString()
   @IsNotEmpty()
   studentName: string;
+
+  @ApiProperty({ type: DegreeDto })
+  @ValidateNested()
+  @Type(() => DegreeDto)
+  degree: DegreeDto;
 
   @ApiProperty({ type: [CourseDto] })
   @IsArray()

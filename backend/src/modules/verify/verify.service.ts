@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { VerifierService } from '../../blockchain/services/verifier.service';
 import { CredentialService } from '../../blockchain/services/credential.service';
-import { VerifyFullDto } from './dto/verify.dto';
+import { VerifyFullDto, VerifyDegreeDto } from './dto/verify.dto';
 
 @Injectable()
 export class VerifyService {
@@ -47,6 +47,40 @@ export class VerifyService {
 
     return {
       credentialId,
+      valid: result,
+    };
+  }
+
+  async verifyDegree(dto: VerifyDegreeDto) {
+    const {
+      credentialId,
+      degreeName,
+      major,
+      graduationYear,
+      proof,
+      signature,
+    } = dto;
+
+    const exists = await this.credentialService.credentialExists(credentialId);
+
+    if (!exists) {
+      throw new NotFoundException('Credential not found');
+    }
+
+    const result = await this.verifierService.verifyDegreePackage(
+      credentialId,
+      degreeName,
+      major,
+      graduationYear,
+      proof,
+      signature,
+    );
+
+    return {
+      credentialId,
+      degreeName,
+      major,
+      graduationYear,
       valid: result,
     };
   }

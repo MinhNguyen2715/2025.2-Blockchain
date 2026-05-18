@@ -79,6 +79,18 @@ contract DiplomaVerifier {
             DiplomaCrypto.hashTranscriptLeaf(courseId, courseName, semester, creditsScaled, grade);
     }
 
+    function hashDegreeLeaf(
+        string memory degreeName,
+        string memory major,
+        string memory graduationYear
+    ) public pure returns (bytes32) {
+        return DiplomaCrypto.hashDegreeLeaf(
+            degreeName,
+            major,
+            graduationYear
+        );
+    }
+
     function verifyCredentialSignature(
         bytes32 credentialId,
         bytes calldata signature
@@ -113,6 +125,29 @@ contract DiplomaVerifier {
 
         bytes32 root = credentialRegistry.getMerkleRoot(credentialId);
         bytes32 leaf = hashTranscriptLeaf(courseId, courseName, semester, creditsScaled, grade);
+
+        return verifyMerkleProof(proof, root, leaf);
+    }
+
+    function verifyDegreePackage(
+        bytes32 credentialId,
+        string memory degreeName,
+        string memory major,
+        string memory graduationYear,
+        bytes32[] memory proof,
+        bytes calldata signature
+    ) external view returns (bool) {
+        if (!verifyCredentialSignature(credentialId, signature)) {
+            return false;
+        }
+
+        bytes32 root = credentialRegistry.getMerkleRoot(credentialId);
+
+        bytes32 leaf = hashDegreeLeaf(
+            degreeName,
+            major,
+            graduationYear
+        );
 
         return verifyMerkleProof(proof, root, leaf);
     }

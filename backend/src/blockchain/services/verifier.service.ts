@@ -40,6 +40,24 @@ export class VerifierService {
     );
   }
 
+  async verifyDegreePackage(
+    credentialId: string,
+    degreeName: string,
+    major: string,
+    graduationYear: string,
+    proof: string[],
+    signature: string,
+  ): Promise<boolean> {
+    return this.contractService.getDiplomaVerifier().verifyDegreePackage(
+      credentialId,
+      degreeName,
+      major,
+      graduationYear,
+      proof,
+      signature,
+    );
+  }
+
   async getCredentialMerkleRoot(credentialId: string): Promise<string> {
     return this.contractService.getDiplomaVerifier().getCredentialMerkleRoot(credentialId);
   }

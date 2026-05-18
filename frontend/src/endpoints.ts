@@ -56,6 +56,26 @@ export const ENDPOINTS: EndpointSpec[] = [
     description:
       'Full package check. Will likely 404 against fake credentialId — what we want to confirm is "we got an HTTP response".',
   },
+  {
+    id: 'verify-degree',
+    group: 'verify',
+    method: 'POST',
+    pathTemplate: '/verify/degree',
+    defaultBody: JSON.stringify(
+      {
+        credentialId: BYTES32_ZERO,
+        degreeName: 'Bachelor of Engineering',
+        major: 'Cybersecurity',
+        graduationYear: '2026',
+        proof: [],
+        signature: SIG_PLACEHOLDER,
+      },
+      null,
+      2,
+    ),
+    description:
+      'Verify that the holder graduated in a specific major using a Merkle proof for the degree leaf.',
+  },
 
   // ── student ───────────────────────────────────────────────────────────
   {
@@ -93,6 +113,7 @@ export const ENDPOINTS: EndpointSpec[] = [
         credentialId: BYTES32_ZERO,
         holderAddress: ADDR_HOLDER,
         courseIds: ['IT1000'],
+        includeDegree: true,
       },
       null,
       2,
@@ -114,6 +135,11 @@ export const ENDPOINTS: EndpointSpec[] = [
         issuerAddress: ADDR_ISSUER,
         studentId: 'SMOKE001',
         studentName: 'Smoke Tester',
+        degree: {
+          degreeName: 'Bachelor of Engineering',
+          major: 'Cybersecurity',
+          graduationYear: '2026',
+        },
         transcript: [
           {
             courseId: 'IT1000',

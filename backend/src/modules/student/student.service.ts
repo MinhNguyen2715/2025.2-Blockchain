@@ -62,7 +62,7 @@ export class StudentService {
   }
 
   async generateProof(dto: GenerateProofDto) {
-    const { credentialId, courseIds, holderAddress } = dto;
+    const { credentialId, courseIds, holderAddress, includeDegree } = dto;
     const normalizedHolderAddress = this.normalizeAddress(holderAddress);
 
     const transcript = await this.transcriptRepository.findOne({
@@ -73,7 +73,10 @@ export class StudentService {
       throw new NotFoundException('Transcript not found');
     }
 
-    const { tree } = this.diplomaUtils.buildTranscriptMerkleTree(transcript.courses);
+    const { tree } = this.diplomaUtils.buildCredentialMerkleTree(
+      transcript.degree,
+      transcript.courses,
+    );
 
     const credential = await this.credentialRepository.findOne({
       where: { credentialId },
@@ -92,6 +95,15 @@ export class StudentService {
 
     const proofs: Record<string, string[]> = {};
 
+    let degreeProof: string[] | undefined;
+
+    if (includeDegree) {
+      degreeProof = this.diplomaUtils.getDegreeMerkleProof(
+        tree,
+        transcript.degree,
+      );
+    }
+
     for (const courseId of courseIds) {
       const course = transcript.courses.find((c) => c.courseId === courseId);
       if (!course) {
@@ -104,6 +116,8 @@ export class StudentService {
 
     return {
       credentialId,
+      degree: includeDegree ? transcript.degree : undefined,
+      degreeProof,
       courseData: transcript.courses.filter((c) => courseIds.includes(c.courseId)),
       proofs,
     };

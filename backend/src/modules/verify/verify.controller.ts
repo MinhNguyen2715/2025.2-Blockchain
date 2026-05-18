@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { VerifyService } from './verify.service';
-import { VerifyFullDto } from './dto/verify.dto';
+import { VerifyFullDto, VerifyDegreeDto } from './dto/verify.dto';
 
 @ApiTags('verify')
 @Controller('verify')
@@ -20,5 +20,12 @@ export class VerifyController {
   @ApiResponse({ status: 200, description: 'Verification result' })
   async verifyFull(@Body() dto: VerifyFullDto) {
     return this.verifyService.verifyFull(dto);
+  }
+
+  @Post('degree')
+  @ApiOperation({ summary: 'Verify degree/major proof' })
+  @ApiResponse({ status: 200, description: 'Degree verification result' })
+  async verifyDegree(@Body() dto: VerifyDegreeDto) {
+    return this.verifyService.verifyDegree(dto);
   }
 }

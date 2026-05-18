@@ -10,6 +10,10 @@ library DiplomaCrypto {
         "TranscriptLeaf(string courseId,string courseName,string semester,uint32 creditsScaled,string grade)"
     );
 
+    bytes32 internal constant DEGREE_LEAF_TYPEHASH = keccak256(
+        "DegreeLeaf(string degreeName,string major,string graduationYear)"
+    );
+
     function hashCredentialStruct(
         bytes32 credentialId,
         address holder,
@@ -48,6 +52,21 @@ library DiplomaCrypto {
                     keccak256(bytes(grade))
                 )
             );
+    }
+
+    function hashDegreeLeaf(
+        string memory degreeName,
+        string memory major,
+        string memory graduationYear
+    ) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                DEGREE_LEAF_TYPEHASH,
+                keccak256(bytes(degreeName)),
+                keccak256(bytes(major)),
+                keccak256(bytes(graduationYear))
+            )
+        );
     }
 
     function processProof(bytes32[] memory proof, bytes32 leaf) internal pure returns (bytes32) {

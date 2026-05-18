@@ -26,6 +26,10 @@ export class DiplomaUtils {
     'TranscriptLeaf(string courseId,string courseName,string semester,uint32 creditsScaled,string grade)',
   );
 
+  readonly DEGREE_LEAF_TYPEHASH = ethers.id(
+    'DegreeLeaf(string degreeName,string major,string graduationYear)',
+  );
+
   buildDiplomaDomain(chainId: number, verifyingContract: string) {
     return {
       ...this.DIPLOMA_DOMAIN,
@@ -81,6 +85,24 @@ export class DiplomaUtils {
     );
   }
 
+  hashDegreeLeaf(record: {
+    degreeName: string;
+    major: string;
+    graduationYear: string;
+  }): string {
+    return ethers.keccak256(
+      abiCoder.encode(
+        ['bytes32', 'bytes32', 'bytes32', 'bytes32'],
+        [
+          this.DEGREE_LEAF_TYPEHASH,
+          ethers.keccak256(ethers.toUtf8Bytes(record.degreeName)),
+          ethers.keccak256(ethers.toUtf8Bytes(record.major)),
+          ethers.keccak256(ethers.toUtf8Bytes(record.graduationYear)),
+        ],
+      ),
+    );
+  }
+
   buildTranscriptMerkleTree(transcript: Array<{
     courseId: string;
     courseName: string;
@@ -96,6 +118,51 @@ export class DiplomaUtils {
       tree,
       root: tree.getHexRoot(),
     };
+  }
+
+  buildCredentialMerkleTree(
+    degree: {
+      degreeName: string;
+      major: string;
+      graduationYear: string;
+    },
+    transcript: Array<{
+      courseId: string;
+      courseName: string;
+      semester: string;
+      creditsScaled: number;
+      grade: string;
+    }>,
+  ) {
+    const degreeLeaf = this.hashDegreeLeaf(degree);
+
+    const transcriptLeaves = transcript.map((record) =>
+      this.hashTranscriptLeaf(record),
+    );
+
+    const leaves = [degreeLeaf, ...transcriptLeaves];
+
+    const tree = new MerkleTree(leaves, keccak256, { sortPairs: true });
+
+    return {
+      leaves,
+      degreeLeaf,
+      transcriptLeaves,
+      tree,
+      root: tree.getHexRoot(),
+    };
+  }
+
+  getDegreeMerkleProof(
+    tree: MerkleTree,
+    degree: {
+      degreeName: string;
+      major: string;
+      graduationYear: string;
+    },
+  ): string[] {
+    const leaf = this.hashDegreeLeaf(degree);
+    return tree.getHexProof(leaf);
   }
 
   getMerkleProof(
