@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/endpoints.ts","./src/main.tsx","./src/types.d.ts","./src/vite-env.d.ts","./src/components/Layout.tsx","./src/components/WalletButton.tsx","./src/lib/api.ts","./src/lib/router.ts","./src/pages/Landing.tsx","./src/pages/Smoke.tsx","./src/pages/Student.tsx","./src/pages/University.tsx","./src/pages/Verify.tsx"],"errors":true,"version":"5.9.3"}
