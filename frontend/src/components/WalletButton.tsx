@@ -6,7 +6,8 @@ function short(addr: string): string {
 
 /**
  * Connect-wallet control using the injected EIP-1193 provider (e.g. MetaMask).
- * No wallet SDK dependency. Falls back gracefully when no provider is present.
+ * No wallet SDK dependency. If no provider is present we render nothing — the
+ * role pages still let you paste a wallet address by hand.
  */
 export function WalletButton() {
   const [account, setAccount] = useState<string | null>(null);
@@ -33,10 +34,7 @@ export function WalletButton() {
   }, [hasProvider]);
 
   async function connect() {
-    if (!hasProvider) {
-      window.open('https://metamask.io/download/', '_blank');
-      return;
-    }
+    if (!hasProvider) return;
     setBusy(true);
     try {
       const accs = (await window.ethereum!.request({
@@ -50,6 +48,9 @@ export function WalletButton() {
     }
   }
 
+  // No injected wallet: keep the header clean. Pages accept pasted addresses.
+  if (!hasProvider) return null;
+
   if (account) {
     return (
       <span className="wallet connected" title={account}>
@@ -61,7 +62,7 @@ export function WalletButton() {
 
   return (
     <button className="wallet" onClick={connect} disabled={busy}>
-      {busy ? 'Connecting…' : hasProvider ? 'Connect Wallet' : 'Install MetaMask'}
+      {busy ? 'Connecting…' : 'Connect Wallet'}
     </button>
   );
 }

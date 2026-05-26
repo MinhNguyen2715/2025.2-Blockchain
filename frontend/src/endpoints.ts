@@ -104,6 +104,15 @@ export const ENDPOINTS: EndpointSpec[] = [
     description: 'List a holder\'s credentials from Postgres. Returns [] if none.',
   },
   {
+    id: 'student-transcript',
+    group: 'student',
+    method: 'GET',
+    pathTemplate: '/student/transcript/:credentialId',
+    pathParams: { credentialId: BYTES32_ZERO },
+    description:
+      'Read-only: returns the degree + course list for a credential. 404 unless the credential exists in the DB.',
+  },
+  {
     id: 'student-generate-proof',
     group: 'student',
     method: 'POST',

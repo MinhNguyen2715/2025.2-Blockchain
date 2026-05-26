@@ -61,6 +61,22 @@ export class StudentService {
     return credentials;
   }
 
+  async getTranscript(credentialId: string) {
+    const transcript = await this.transcriptRepository.findOne({
+      where: { credentialId },
+    });
+
+    if (!transcript) {
+      throw new NotFoundException('Transcript not found');
+    }
+
+    return {
+      credentialId,
+      degree: transcript.degree,
+      courses: transcript.courses,
+    };
+  }
+
   async generateProof(dto: GenerateProofDto) {
     const { credentialId, courseIds, holderAddress, includeDegree } = dto;
     const normalizedHolderAddress = this.normalizeAddress(holderAddress);

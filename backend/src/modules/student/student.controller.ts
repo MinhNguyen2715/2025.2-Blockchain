@@ -23,6 +23,13 @@ export class StudentController {
     return this.studentService.getCredentials(walletAddress);
   }
 
+  @Get('transcript/:credentialId')
+  @ApiOperation({ summary: 'Get the degree + course list for a credential' })
+  @ApiResponse({ status: 200, description: 'Transcript found' })
+  async getTranscript(@Param('credentialId') credentialId: string) {
+    return this.studentService.getTranscript(credentialId);
+  }
+
   @Post('generate-proof')
   @ApiOperation({ summary: 'Generate Merkle proof for specific course(s)' })
   @ApiResponse({ status: 200, description: 'Proof generated' })
