@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiFetch, pretty } from '../lib/api';
+import { formatError, ErrorView } from '../lib/errors';
 import { connectWallet, hasInjectedProvider, useInjectedAccount } from '../lib/wallet';
 import {
   buildBundle,
@@ -36,13 +37,6 @@ function short(s: string): string {
   return s.length > 14 ? `${s.slice(0, 8)}…${s.slice(-6)}` : s;
 }
 
-function errOf(res: { error?: string; body?: unknown; status?: number }): string {
-  if (res.error) return res.error;
-  const body = res.body as Record<string, unknown> | undefined;
-  const msg = body && (Array.isArray(body.message) ? body.message.join(', ') : body.message);
-  return (msg as string) || `HTTP ${res.status}`;
-}
-
 function download(filename: string, text: string) {
   const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -53,25 +47,40 @@ function download(filename: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
+function ErrorPanel({ err }: { err: ErrorView }) {
+  return (
+    <div className="error-panel">
+      <div className="error-headline">{err.headline}</div>
+      {err.bullets.length > 0 && (
+        <ul className="error-bullets">
+          {err.bullets.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function Student() {
   const injected = useInjectedAccount();
   const [wallet, setWallet] = useState('');
 
   const [creds, setCreds] = useState<Credential[] | null>(null);
   const [loadingCreds, setLoadingCreds] = useState(false);
-  const [credError, setCredError] = useState<string | null>(null);
+  const [credError, setCredError] = useState<ErrorView | null>(null);
 
   const [selected, setSelected] = useState<Credential | null>(null);
   const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [loadingTx, setLoadingTx] = useState(false);
-  const [txError, setTxError] = useState<string | null>(null);
+  const [txError, setTxError] = useState<ErrorView | null>(null);
 
   const [includeDegree, setIncludeDegree] = useState(true);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
 
   const [bundle, setBundle] = useState<ProofBundle | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
+  const [genError, setGenError] = useState<ErrorView | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Mirror a connected wallet into the address field once, if the box is empty.
@@ -97,7 +106,7 @@ export function Student() {
     const res = await apiFetch(`/student/credentials/${encodeURIComponent(addr)}`);
     setLoadingCreds(false);
     if ('error' in res || !res.ok) {
-      setCredError(errOf(res as never));
+      setCredError(formatError(res));
       return;
     }
     setCreds(Array.isArray(res.body) ? (res.body as Credential[]) : []);
@@ -115,7 +124,7 @@ export function Student() {
     const res = await apiFetch(`/student/transcript/${encodeURIComponent(c.credentialId)}`);
     setLoadingTx(false);
     if ('error' in res || !res.ok) {
-      setTxError(errOf(res as never));
+      setTxError(formatError(res));
       return;
     }
     setTranscript(res.body as Transcript);
@@ -127,7 +136,10 @@ export function Student() {
       .filter(([, v]) => v)
       .map(([k]) => k);
     if (!includeDegree && courseIds.length === 0) {
-      setGenError('Select the degree and/or at least one course to prove.');
+      setGenError({
+        headline: 'Nothing to share',
+        bullets: ['Select the degree and/or at least one course to prove.'],
+      });
       return;
     }
     setGenerating(true);
@@ -144,7 +156,7 @@ export function Student() {
     });
     setGenerating(false);
     if ('error' in res || !res.ok) {
-      setGenError(errOf(res as never));
+      setGenError(formatError(res));
       return;
     }
     const built = buildBundle(selected.signature ?? '', res.body as GenerateProofResponse);
@@ -201,12 +213,7 @@ export function Student() {
             </button>
           </div>
         </div>
-        {credError && (
-          <div className="privacy-note" style={{ borderLeftColor: 'var(--err)', marginTop: '0.9rem' }}>
-            <span>⚠</span>
-            <span>{credError}</span>
-          </div>
-        )}
+        {credError && <ErrorPanel err={credError} />}
       </div>
 
       {/* ── credential list ────────────────────────────────────── */}
@@ -253,12 +260,7 @@ export function Student() {
           <h2>Compose a proof</h2>
           <div className="panel">
             {loadingTx && <p className="lead">Loading transcript…</p>}
-            {txError && (
-              <div className="privacy-note" style={{ borderLeftColor: 'var(--err)' }}>
-                <span>⚠</span>
-                <span>{txError}</span>
-              </div>
-            )}
+            {txError && <ErrorPanel err={txError} />}
 
             {transcript && (
               <>
@@ -310,12 +312,7 @@ export function Student() {
                   </span>
                 </div>
 
-                {genError && (
-                  <div className="privacy-note" style={{ borderLeftColor: 'var(--err)', marginTop: '0.9rem' }}>
-                    <span>⚠</span>
-                    <span>{genError}</span>
-                  </div>
-                )}
+                {genError && <ErrorPanel err={genError} />}
 
                 <div className="actions" style={{ marginTop: '1.2rem' }}>
                   <button className="btn lg" onClick={generate} disabled={generating}>
@@ -334,7 +331,7 @@ export function Student() {
           <h2>Proof created</h2>
           <div className="panel">
             <div className="result-banner ok" style={{ marginTop: 0 }}>
-              <span className="verdict">PROOF READY</span>
+              <span className="verdict">✅ Proof ready</span>
               <span className="claims">Hand this file to a verifier — they load it on the Verify page.</span>
             </div>
 
@@ -377,11 +374,6 @@ export function Student() {
                 {copied ? 'Copied ✓' : 'Copy JSON'}
               </button>
             </div>
-
-            <details className="drawer" style={{ marginTop: '1rem' }}>
-              <summary>Proof bundle</summary>
-              <pre>{pretty(bundle)}</pre>
-            </details>
           </div>
         </section>
       )}

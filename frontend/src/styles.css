@@ -963,3 +963,185 @@ button.reset {
     display: none;
   }
 }
+
+/* ============================================================
+   Pass 2 — bullet errors, banner bullets, preview kv lists,
+   landing-card bullets, read-only transcript rows
+   ============================================================ */
+
+/* role-card bullet list on landing */
+.role-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.role-bullets li::before {
+  content: '— ';
+  color: var(--plum-2);
+}
+
+/* generic bullet-style error panel */
+.error-panel {
+  background: var(--err-bg);
+  border: 1px solid #5a2c2e;
+  border-left: 3px solid var(--err);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem 1rem;
+  margin: 0.9rem 0;
+  color: var(--text);
+}
+.error-headline {
+  color: var(--err);
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+}
+.error-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.88rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.error-bullets li {
+  color: var(--text);
+}
+.error-bullets li::before {
+  content: '• ';
+  color: var(--err);
+}
+
+/* bullets inside a result-banner (verify success/failure) */
+.banner-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+  font-size: 0.92rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--text);
+}
+.banner-bullets li {
+  padding-left: 0.2rem;
+}
+.result-banner.ok .banner-bullets li::before {
+  content: '✓ ';
+  color: var(--ok);
+  font-weight: 700;
+}
+.result-banner.bad .banner-bullets li::before {
+  content: '✗ ';
+  color: var(--err);
+  font-weight: 700;
+}
+.result-banner.warn .banner-bullets li::before {
+  content: '! ';
+  color: var(--warn);
+  font-weight: 700;
+}
+
+/* preview before issuing */
+.preview-head {
+  margin-bottom: 1.2rem;
+}
+.preview-head h2 {
+  font-size: clamp(1.4rem, 3vw, 1.8rem);
+  margin: 0.3rem 0 0.4rem;
+}
+.preview-head .lead {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.kv-section {
+  border-top: 1px solid var(--border);
+  padding: 1rem 0;
+}
+.kv-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+.kv-title {
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--plum-2);
+  font-weight: 700;
+  margin: 0 0 0.6rem;
+}
+.kv-list {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.6fr) 1fr;
+  column-gap: 1rem;
+  row-gap: 0.45rem;
+  margin: 0;
+}
+.kv-list dt {
+  color: var(--muted);
+  font-size: 0.82rem;
+  padding-top: 0.1rem;
+}
+.kv-list dd {
+  color: var(--text);
+  font-size: 0.92rem;
+  margin: 0;
+  word-break: break-word;
+}
+.kv-list dd.mono {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+.kv-list dd.break {
+  overflow-wrap: anywhere;
+}
+.kv-pending {
+  color: var(--muted-2);
+  font-style: italic;
+  font-size: 0.88rem;
+}
+.kv-empty {
+  color: var(--err);
+  font-style: italic;
+  font-size: 0.86rem;
+}
+.kv-note {
+  margin: 0.2rem 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.kv-note.muted {
+  color: var(--muted-2);
+  font-style: italic;
+}
+
+/* read-only transcript rows (preview) */
+.tx-row.tx-readonly {
+  align-items: baseline;
+}
+.tx-row.tx-readonly span {
+  padding: 0.4rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .kv-list {
+    grid-template-columns: 1fr;
+    row-gap: 0.15rem;
+  }
+  .kv-list dt {
+    padding-top: 0.4rem;
+  }
+}

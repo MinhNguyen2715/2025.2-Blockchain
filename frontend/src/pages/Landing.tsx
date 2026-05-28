@@ -1,21 +1,31 @@
 const ROLES = [
   {
-    to: '#/verify',
-    glyph: '✓',
-    title: "I'm verifying",
-    desc: 'Check a proof someone shared with you. Confirm a degree, course, or credential status — without ever seeing their grades.',
-  },
-  {
     to: '#/student',
     glyph: '🎓',
     title: "I'm a student",
-    desc: 'View the credentials issued to you and generate a shareable proof that reveals only what you choose.',
+    bullets: [
+      'View the diplomas issued to you',
+      'Create a proof to share with an employer',
+    ],
   },
   {
     to: '#/university',
     glyph: '🏛',
-    title: "I'm the university",
-    desc: 'Issue and revoke credentials and authorize issuer wallets. Admin-key protected.',
+    title: "I'm a university",
+    bullets: [
+      'Issue digital diplomas',
+      'Revoke diplomas',
+      'Authorize issuers',
+    ],
+  },
+  {
+    to: '#/verify',
+    glyph: '✓',
+    title: "I'm a verifier",
+    bullets: [
+      'Load a proof a student sent you',
+      'Verify a diploma, a course, or credential validity',
+    ],
   },
 ];
 
@@ -40,7 +50,11 @@ export function Landing() {
           <a key={r.to} href={r.to} className="role-card">
             <span className="glyph">{r.glyph}</span>
             <h3>{r.title}</h3>
-            <p>{r.desc}</p>
+            <ul className="role-bullets">
+              {r.bullets.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
             <span className="enter">Enter →</span>
           </a>
         ))}

@@ -1,13 +1,14 @@
 import { useRef, useState } from 'react';
-import { apiFetch, pretty, ApiResult } from '../lib/api';
+import { apiFetch, ApiResult } from '../lib/api';
+import { formatError } from '../lib/errors';
 import { parseBundle, CourseClaim } from '../lib/proof';
 
 type Mode = 'degree' | 'course' | 'status';
 
 const MODE_LABEL: Record<Mode, string> = {
-  degree: 'Degree',
-  course: 'Course',
-  status: 'Status',
+  degree: 'Verify degree information',
+  course: 'Verify one course',
+  status: 'Check revocation status',
 };
 
 type DegreeFields = {
@@ -61,51 +62,93 @@ function parseProofLines(text: string): string[] {
 type Verdict = {
   kind: 'ok' | 'bad' | 'warn';
   headline: string;
-  claims?: string;
-  meta: string;
-  raw: string;
+  bullets: string[];
+  /** Optional claim line shown beneath the headline (e.g. degree summary). */
+  claim?: string;
 };
 
 function interpret(mode: Mode, res: ApiResult): Verdict {
   if ('error' in res) {
     return {
       kind: 'bad',
-      headline: 'CONNECTION ERROR',
-      meta: `Could not reach the backend · ${res.ms}ms`,
-      raw: res.error,
+      headline: '❌ Connection error',
+      bullets: [res.error || 'Could not reach the verification service.'],
     };
   }
-  const ms = `${res.status} · ${res.ms}ms`;
-  const body = (res.body && typeof res.body === 'object' ? res.body : {}) as Record<string, unknown>;
 
-  if (res.status === 404) {
-    return { kind: 'warn', headline: 'CREDENTIAL NOT FOUND', meta: ms, raw: res.raw };
+  if (!res.ok) {
+    // 404 → the credential doesn't exist on-chain
+    if (res.status === 404) {
+      return {
+        kind: 'warn',
+        headline: '❌ Invalid credential',
+        bullets: ['This credential does not exist on the blockchain.'],
+      };
+    }
+    // 4xx/5xx → render as bullet list (validation errors, missing fields, 401, etc.)
+    const e = formatError(res);
+    return {
+      kind: 'warn',
+      headline: e.headline,
+      bullets: e.bullets,
+    };
   }
-  if (res.status >= 400) {
-    const msg =
-      (Array.isArray(body.message) ? body.message.join(', ') : (body.message as string)) ||
-      'Request rejected';
-    return { kind: 'warn', headline: 'REQUEST REJECTED', claims: msg, meta: ms, raw: res.raw };
-  }
+
+  const body = (res.body && typeof res.body === 'object' ? res.body : {}) as Record<string, unknown>;
 
   if (mode === 'status') {
     if (body.revoked === true) {
-      return { kind: 'warn', headline: 'REVOKED', claims: 'This credential has been revoked.', meta: ms, raw: res.raw };
+      return {
+        kind: 'bad',
+        headline: '❌ Invalid credential',
+        bullets: ['This credential has been revoked.'],
+      };
     }
-    return body.valid === true
-      ? { kind: 'ok', headline: 'VALID', claims: 'Credential is live and not revoked.', meta: ms, raw: res.raw }
-      : { kind: 'bad', headline: 'NOT VALID', meta: ms, raw: res.raw };
+    if (body.valid === true) {
+      return {
+        kind: 'ok',
+        headline: '✅ Valid credential',
+        bullets: [
+          'This credential exists on the blockchain.',
+          'It has not been revoked.',
+        ],
+      };
+    }
+    return {
+      kind: 'bad',
+      headline: '❌ Invalid credential',
+      bullets: ['The credential failed an on-chain status check.'],
+    };
   }
 
   // degree / course
   if (body.valid === true) {
-    const claims =
+    const lastBullet =
+      mode === 'degree'
+        ? 'The disclosed degree is included in the original transcript.'
+        : 'The disclosed course is included in the original transcript.';
+    const claim =
       mode === 'degree'
         ? [body.degreeName, body.major, body.graduationYear].filter(Boolean).join(' · ')
-        : 'Course record confirmed against the credential.';
-    return { kind: 'ok', headline: 'VALID', claims, meta: ms, raw: res.raw };
+        : undefined;
+    return {
+      kind: 'ok',
+      headline: '✅ Valid credential',
+      bullets: [
+        'This credential was issued by an authorized university.',
+        'The university digital signature is valid.',
+        'The credential has not been revoked.',
+        lastBullet,
+      ],
+      claim: claim || undefined,
+    };
   }
-  return { kind: 'bad', headline: 'NOT VALID', claims: 'The proof did not check out against this credential.', meta: ms, raw: res.raw };
+
+  return {
+    kind: 'bad',
+    headline: '❌ Invalid credential',
+    bullets: ['The privacy proof did not match the credential.'],
+  };
 }
 
 /** A single labeled text input. */
@@ -315,7 +358,7 @@ export function Verify() {
             <Field label="Major" value={degree.major} onChange={(v) => setDegree({ ...degree, major: v })} />
             <Field label="Graduation year" value={degree.graduationYear} onChange={(v) => setDegree({ ...degree, graduationYear: v })} />
             <label className="field span-2">
-              Merkle proof (one hash per line)
+              Privacy proof (one hash per line)
               <textarea
                 className="mono"
                 value={degree.proof}
@@ -326,7 +369,7 @@ export function Verify() {
               />
             </label>
             <label className="field span-2">
-              Issuer signature
+              University digital signature
               <input
                 className="mono"
                 value={degree.signature}
@@ -363,10 +406,10 @@ export function Verify() {
               <Field label="Course ID" value={course.courseId} onChange={(v) => setCourse({ ...course, courseId: v })} />
               <Field label="Course name" value={course.courseName} onChange={(v) => setCourse({ ...course, courseName: v })} />
               <Field label="Semester" value={course.semester} onChange={(v) => setCourse({ ...course, semester: v })} />
-              <Field label="Credits (scaled ×100)" type="number" value={course.creditsScaled} onChange={(v) => setCourse({ ...course, creditsScaled: v })} />
+              <Field label="Credit" type="number" value={course.creditsScaled} onChange={(v) => setCourse({ ...course, creditsScaled: v })} />
               <Field label="Grade" value={course.grade} onChange={(v) => setCourse({ ...course, grade: v })} />
               <label className="field span-2">
-                Merkle proof (one hash per line)
+                Privacy proof (one hash per line)
                 <textarea
                   className="mono"
                   value={course.proof}
@@ -377,7 +420,7 @@ export function Verify() {
                 />
               </label>
               <label className="field span-2">
-                Issuer signature
+                University digital signature
                 <input
                   className="mono"
                   value={course.signature}
@@ -395,7 +438,7 @@ export function Verify() {
             <span>🔒</span>
             <span>
               <strong>Privacy preserved.</strong> A degree check confirms only the degree, major,
-              and graduation year via a Merkle proof. The transcript and grades are never
+              and graduation year via a privacy proof. The transcript and grades are never
               transmitted.
             </span>
           </div>
@@ -403,25 +446,21 @@ export function Verify() {
 
         <div className="actions" style={{ marginTop: '1.2rem' }}>
           <button className="btn lg" onClick={verify} disabled={loading}>
-            {loading ? 'Verifying…' : `Verify ${MODE_LABEL[mode].toLowerCase()}`}
+            {loading ? 'Verifying…' : 'Verify'}
           </button>
         </div>
 
         {verdict && (
           <div className={`result-banner ${verdict.kind}`}>
             <span className="verdict">{verdict.headline}</span>
-            {verdict.claims && <span className="claims">{verdict.claims}</span>}
-            <span className="meta">{verdict.meta}</span>
-            <details className="drawer">
-              <summary>Raw response</summary>
-              <pre>{(() => {
-                try {
-                  return pretty(JSON.parse(verdict.raw));
-                } catch {
-                  return verdict.raw || '(empty body)';
-                }
-              })()}</pre>
-            </details>
+            {verdict.claim && <span className="claims">{verdict.claim}</span>}
+            {verdict.bullets.length > 0 && (
+              <ul className="banner-bullets">
+                {verdict.bullets.map((b, i) => (
+                  <li key={i}>{b}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>
