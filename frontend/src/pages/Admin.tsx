@@ -36,7 +36,7 @@ export function Admin() {
     setBusy(true);
     setError(null);
     setSuccess(null);
-    const res = await apiFetch('/university/add-issuer', {
+    const res = await apiFetch('/admin/issuers', {
       method: 'POST',
       adminKey,
       body: {
@@ -58,7 +58,7 @@ export function Admin() {
     <div>
       <div className="page-head">
         <span className="eyebrow">Platform admin</span>
-        <h1>Admin console</h1>
+        <h1>Admin</h1>
         <p>
           Authorize a new issuer (university) wallet so the issuer can start issuing credentials.
           This is the only action that requires the administration key.

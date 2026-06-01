@@ -1,12 +1,20 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards} from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UniversityService } from './university.service';
 import { IssueCredentialDto } from './dto/issue-credential.dto';
-import { RevokeCredentialDto, AddIssuerDto } from './dto/revoke-credential.dto';
-import { AdminApiKeyGuard } from '../../shared/guards/admin-api-key.guard';
+import { RevokeCredentialDto } from './dto/revoke-credential.dto';
+import { IssuerApiKeyGuard } from '../../shared/guards/issuer-api-key.guard';
 
 @ApiTags('university')
 @Controller('university')
+@UseGuards(IssuerApiKeyGuard)
 export class UniversityController {
   constructor(private readonly universityService: UniversityService) {}
 
@@ -18,6 +26,7 @@ export class UniversityController {
   async issueCredential(@Body() dto: IssueCredentialDto) {
     return this.universityService.issueCredential(dto);
   }
+
   @Post('revoke')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Revoke a credential' })
@@ -25,15 +34,4 @@ export class UniversityController {
   async revokeCredential(@Body() dto: RevokeCredentialDto) {
     return this.universityService.revokeCredential(dto);
   }
-
-  @UseGuards(AdminApiKeyGuard)
-  @Post('add-issuer')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Add authorized issuer (admin only)' })
-  @ApiResponse({ status: 200, description: 'Issuer added successfully' })
-  async addIssuer(@Body() dto: AddIssuerDto) {
-    return this.universityService.addIssuer(dto);
-  }
 }
-
-

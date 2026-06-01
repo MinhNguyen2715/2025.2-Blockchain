@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Contract } from 'ethers';
 import { ContractService } from './contract.service';
-import { getAdminWallet } from '../signers';
 
 @Injectable()
 export class IssuerService {
@@ -14,7 +13,7 @@ export class IssuerService {
   }
 
   async addIssuer(address: string, name: string): Promise<void> {
-    const wallet = getAdminWallet();
+    const wallet = this.contractService.getAdminWallet();
 
     const registry = this.contractService
       .getIssuerRegistry()
@@ -25,7 +24,7 @@ export class IssuerService {
   }
 
   async removeIssuer(address: string): Promise<void> {
-    const wallet = getAdminWallet();
+    const wallet = this.contractService.getAdminWallet();
 
     const registry = this.contractService
       .getIssuerRegistry()

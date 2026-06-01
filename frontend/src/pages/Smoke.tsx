@@ -3,7 +3,12 @@ import { ENDPOINTS, EndpointSpec, buildPath, pathParamNames } from '../endpoints
 
 const DEFAULT_API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined) || 'http://localhost:3000/api';
-const DEFAULT_ADMIN_KEY = (import.meta.env.VITE_ADMIN_API_KEY as string | undefined) || '';
+
+const DEFAULT_ADMIN_KEY =
+  (import.meta.env.VITE_ADMIN_API_KEY as string | undefined) || '';
+
+const DEFAULT_ISSUER_KEY =
+  (import.meta.env.VITE_ISSUER_API_KEY as string | undefined) || '';
 
 type Result =
   | { status: number; ok: boolean; body: string; ms: number }
@@ -41,6 +46,7 @@ function statusText(r: Result | null): string {
 export function Smoke() {
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
   const [adminKey, setAdminKey] = useState(DEFAULT_ADMIN_KEY);
+  const [issuerKey, setIssuerKey] = useState(DEFAULT_ISSUER_KEY);
 
   const initialStates = useMemo<Record<string, EndpointState>>(() => {
     const map: Record<string, EndpointState> = {};
@@ -78,6 +84,7 @@ export function Smoke() {
     }
 
     if (spec.adminKey) headers['x-admin-api-key'] = adminKey;
+    if (spec.issuerKey) headers['x-issuer-api-key'] = issuerKey;
 
     const t0 = performance.now();
     try {
@@ -97,10 +104,15 @@ export function Smoke() {
     }
   }
 
-  const groups: Array<{ key: EndpointSpec['group']; title: string; note?: string }> = [
+  const groups: Array<{
+    key: EndpointSpec['group'];
+    title: string;
+    note?: string;
+  }> = [
     { key: 'verify', title: 'verify', note: 'public — no auth' },
     { key: 'student', title: 'student', note: 'public — no auth' },
-    { key: 'university', title: 'university', note: 'requires x-admin-api-key' },
+    { key: 'admin', title: 'admin', note: 'requires x-admin-api-key' },
+    { key: 'university', title: 'university', note: 'requires x-issuer-api-key' },
   ];
 
   return (
@@ -124,6 +136,16 @@ export function Smoke() {
           <input
             value={adminKey}
             onChange={(e) => setAdminKey(e.target.value)}
+            type="password"
+            placeholder="(blank to test the 401 path)"
+            spellCheck={false}
+          />
+        </label>
+        <label className="field">
+          x-issuer-api-key
+          <input
+            value={issuerKey}
+            onChange={(e) => setIssuerKey(e.target.value)}
             type="password"
             placeholder="(blank to test the 401 path)"
             spellCheck={false}

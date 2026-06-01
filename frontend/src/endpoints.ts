@@ -4,8 +4,8 @@
 
 export type EndpointSpec = {
   id: string;
-  group: 'verify' | 'student' | 'university';
-  method: 'GET' | 'POST';
+  group: 'verify' | 'student' | 'university' | 'admin';
+  method: 'GET' | 'POST' | 'DELETE';
   /** Path relative to VITE_API_BASE, e.g. "/student/credentials/:walletAddress". */
   pathTemplate: string;
   /** Default values for any :params in pathTemplate. */
@@ -14,6 +14,8 @@ export type EndpointSpec = {
   defaultBody?: string;
   /** Whether this route requires the x-admin-api-key header. */
   adminKey?: boolean;
+  /** Whether this route requires the x-issuer-api-key header. */
+  issuerKey?: boolean;
   /** Short description shown under the endpoint title. */
   description: string;
 };
@@ -137,6 +139,7 @@ export const ENDPOINTS: EndpointSpec[] = [
     group: 'university',
     method: 'POST',
     pathTemplate: '/university/issue',
+    issuerKey: true,
     defaultBody: JSON.stringify(
       {
         holderAddress: ADDR_HOLDER,
@@ -162,28 +165,29 @@ export const ENDPOINTS: EndpointSpec[] = [
       2,
     ),
     description:
-      'Without the admin key you should see 401. With a wrong issuer address you should see 400. Either proves the route is reachable.',
+    'Issue a credential. Requires x-issuer-api-key. With a wrong issuer address you should see 400.',
   },
   {
     id: 'university-revoke',
     group: 'university',
     method: 'POST',
     pathTemplate: '/university/revoke',
+    issuerKey: true,
     defaultBody: JSON.stringify({ credentialId: BYTES32_ZERO }, null, 2),
-    description: 'Revoke a credential. No admin key required.',
+    description: 'Revoke a credential. Requires x-issuer-api-key.',
   },
   {
-    id: 'university-add-issuer',
-    group: 'university',
+    id: 'admin-add-issuer',
+    group: 'admin',
     method: 'POST',
-    pathTemplate: '/university/add-issuer',
+    pathTemplate: '/admin/issuers',
     adminKey: true,
     defaultBody: JSON.stringify(
       { issuerAddress: ADDR_ISSUER, issuerName: 'Smoke University' },
       null,
       2,
     ),
-    description: 'Authorize a new issuer wallet. Needs x-admin-api-key.',
+    description: 'Authorize a new issuer wallet. Requires x-admin-api-key.',
   },
 ];
 

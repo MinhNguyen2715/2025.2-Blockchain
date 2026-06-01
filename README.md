@@ -1,394 +1,250 @@
-# 📘 Digital Diploma Smart Contract System
-
-## 📌 Overview
-
-This project implements a **Digital Diploma Issuance and Verification System** using smart contracts.
-
-### 🎯 Objectives
-
-- Allow a student (Holder) to prove graduation
-- Avoid revealing full transcript or unnecessary personal data
-- Support **revocation** of invalid diplomas
-- Enable **selective disclosure** using a **Merkle Tree**
-
----
-
-## 🏗️ System Architecture
-
-```text
-IssuerRegistry → CredentialRegistry → DiplomaVerifier
-```
+# DIGITAL DIPLOMA ISSUANCE AND VERIFICATION SYSTEM
 
-### Components
+## OVERVIEW
 
-| Component | Description |
-|----------|-------------|
-| IssuerRegistry | Manage authorized universities |
-| CredentialRegistry | Store issued diplomas and revocation status |
-| DiplomaVerifier | Verify diploma validity |
+This project is a Digital Diploma Issuance and Verification System.
 
----
+The application allows:
 
-## 📁 Project Structure
+* Admin to authorize universities.
+* University to issue digital diplomas to students.
+* Student to generate proof for selected diploma or transcript information.
+* Verifier to verify diploma validity through blockchain.
 
-```text
-digital-diploma-contracts/
-│
-├── contracts/
-│   ├── IssuerRegistry.sol
-│   ├── CredentialRegistry.sol
-│   ├── DiplomaVerifier.sol
-│   │
-│   ├── interfaces/
-│   │   ├── IIssuerRegistry.sol
-│   │   └── ICredentialRegistry.sol
-│   │
-│   └── libraries/
-│       ├── DiplomaStructs.sol
-│       ├── DiplomaErrors.sol
-│       └── DiplomaEvents.sol
-│
-├── scripts/
-│   ├── deployAll.js
-│   ├── demoFlow.js
-│   └── demoMerkleProof.js
-│
-├── deployments/
-│   └── localhost.json
-│
-├── test/
-│   ├── IssuerRegistry.test.js
-│   ├── CredentialRegistry.test.js
-│   └── DiplomaVerifier.test.js
-│
-├── hardhat.config.ts
-├── package.json
-└── README.md
-```
+The system uses blockchain to store verification-critical data and uses PostgreSQL to store detailed academic data.
 
----
+On-chain data:
 
-## 📄 File Descriptions
+* Credential ID
+* Issuer address
+* Holder address
+* Merkle root
+* Metadata hash
+* Revocation status
+* Issue timestamp
 
-### `contracts/IssuerRegistry.sol`
+Off-chain data:
 
-Manages the list of authorized universities.
+* Student information
+* Degree information
+* Transcript
+* Course information
+* Grade and credit information
 
-Main responsibilities:
-- Store authorized issuers
-- Allow only the owner to add or remove issuers
-- Provide issuer validation for other contracts
+The main idea is that the verifier does not need to trust the database directly. The verifier checks the credential status and Merkle proof against blockchain data.
 
----
+## MAIN ROLES
 
-### `contracts/CredentialRegistry.sol`
+### Admin
 
-Stores diploma-related data.
+The admin manages authorized universities.
 
-Main data:
-- `credentialId`
-- `issuer`
-- `holder`
-- `merkleRoot`
-- `metadataHash`
-- `revoked`
+Admin can:
 
-Main responsibilities:
-- Issue credential
-- Revoke credential
-- Return credential information
+* Add a university issuer address.
+* Allow that issuer to issue valid credentials.
 
----
+### University / Issuer
 
-### `contracts/DiplomaVerifier.sol`
+The university issues and revokes digital diploma credentials.
 
-Handles verification logic.
+University can:
 
-Main responsibilities:
-- Check whether issuer is authorized
-- Check whether credential exists
-- Check whether credential has been revoked
-- Return the Merkle root of a valid credential
-- Verify Merkle proof on chain
+* Issue a diploma credential to a student.
+* Revoke a credential if needed.
 
----
+### Student / Holder
 
-### `contracts/interfaces/IIssuerRegistry.sol`
+The student owns the credential.
 
-Interface used by other contracts to verify issuer status.
+Student can:
 
----
+* Register a wallet address.
+* View issued credentials.
+* Generate proof for selected course or degree information.
 
-### `contracts/interfaces/ICredentialRegistry.sol`
+### Verifier
 
-Interface used by verifier contracts to access credential data.
+The verifier checks whether a diploma or selected academic information is valid.
 
----
+Verifier can:
 
-### `contracts/libraries/DiplomaStructs.sol`
+* Check credential status.
+* Verify course proof.
+* Verify degree proof.
 
-Contains reusable struct definitions.
+## SYSTEM FLOW
 
----
+### Issuer Authorization Flow
 
-### `contracts/libraries/DiplomaErrors.sol`
+1. Admin enters the university issuer address and issuer name.
+2. Backend checks the admin API key.
+3. Backend sends a transaction to IssuerRegistry smart contract.
+4. IssuerRegistry stores the university address as an authorized issuer.
+5. The university is now allowed to issue credentials.
 
-Contains custom error definitions.
+### Student Registration Flow
 
----
+1. Student enters wallet address and personal information.
+2. Backend stores the student information in PostgreSQL.
+3. The student can now receive credentials from a university.
 
-### `contracts/libraries/DiplomaEvents.sol`
+### Credential Issuance Flow
 
-Contains shared event definitions.
+1. University enters student, degree, and transcript information.
+2. Backend checks whether the issuer address is authorized on-chain.
+3. Backend creates Merkle leaves from degree and transcript data.
+4. Backend builds a Merkle tree.
+5. Backend gets the Merkle root.
+6. Backend creates a credential ID and metadata hash.
+7. Backend signs the credential data using the issuer private key.
+8. Backend sends a transaction to CredentialRegistry smart contract.
+9. Smart contract verifies:
 
----
+   * The credential ID has not been used.
+   * The issuer is authorized.
+   * The issuer signature is valid.
+   * The credential data is valid.
+10. Smart contract stores the credential verification data on-chain.
+11. Backend stores detailed student, degree, and transcript data in PostgreSQL.
 
-### `scripts/deployAll.js`
+After this flow, the student has a valid digital diploma credential.
 
-Deploys the full smart contract system in the correct order:
-1. `IssuerRegistry`
-2. `CredentialRegistry`
-3. `DiplomaVerifier`
+### Proof Generation Flow
 
----
+1. Student selects a credential.
+2. Student chooses which information to prove, such as:
 
-### `scripts/demoFlow.js`
+   * A specific course
+   * Degree name
+   * Major
+   * Graduation year
+3. Backend checks whether the credential belongs to the student wallet.
+4. Backend loads the full transcript and degree data from PostgreSQL.
+5. Backend rebuilds the same Merkle tree used during issuance.
+6. Backend generates a Merkle proof for the selected information.
+7. Student receives the proof and can send it to a verifier.
 
-Runs a full demo workflow:
-1. Add issuer
-2. Issue credential
-3. Verify credential
-4. Revoke credential
-5. Verify again
+This allows selective disclosure. The student does not need to reveal the full transcript.
 
----
-### `scripts/demoMerkleProof.js`
+### Verification Flow
 
-Runs an end-to-end Merkle proof demo:
-- Generate transcript
-- Build Merkle tree (off-chain)
-- Generate Merkle proof
-- Issue credential with Merkle root
-- Verify proof on-chain
----
+1. Verifier receives:
+   * Credential ID
+   * Selected academic information
+   * Merkle proof
+2. Verifier submits the data to the verification API or frontend page.
+3. Backend reads the credential data from the smart contract.
+4. The system checks:
+   * Credential exists.
+   * Credential is not revoked.
+   * Issuer is still authorized.
+   * Merkle proof matches the on-chain Merkle root.
+5. If all checks pass, the proof is valid.
+6. If one check fails, the proof is invalid.
 
-### `test/`
+### Revocation Flow
 
-Contains unit tests for all smart contracts.
+1. University enters the credential ID to revoke.
+2. Backend sends a transaction to CredentialRegistry smart contract.
+3. Smart contract checks that the caller is the original issuer.
+4. Credential status is changed to revoked.
+5. Future verification will fail because the credential is no longer active.
 
----
+## SMART CONTRACTS
 
-## ⚙️ Setup
+### IssuerRegistry
 
-### Install dependencies
+Used to manage authorized university issuers.
 
-```bash
-npm install
-```
+Main purpose:
 
-### Compile contracts
+* Store authorized issuer addresses.
+* Check whether an issuer is allowed to issue credentials.
 
-```bash
-npx hardhat compile
-```
+### CredentialRegistry
 
-### Run tests
+Used to store credential verification data on-chain.
 
-```bash
-npx hardhat test
-```
+Main purpose:
 
----
+* Issue credential.
+* Store Merkle root.
+* Store credential status.
+* Revoke credential.
 
-## 🚀 Run Local Blockchain
+### DiplomaVerifier
 
-### Step 1: Start local node
+Used to verify credential status and Merkle proofs.
 
-```bash
-npx hardhat node
-```
+Main purpose:
 
-### Step 2: Deploy contracts
+* Verify whether a credential is active.
+* Verify selected course proof.
+* Verify degree proof.
 
-```bash
-npx hardhat run scripts/deployAll.js --network localhost
-```
+## BACKEND RESPONSIBILITY
 
-### Step 3: Run demo flow
+The backend is responsible for:
 
-```bash
-npx hardhat run scripts/demoFlow.js --network localhost
-```
+* Handling API requests.
+* Connecting frontend with smart contracts.
+* Connecting to PostgreSQL.
+* Creating Merkle trees.
+* Generating Merkle proofs.
+* Signing credential data.
+* Sending blockchain transactions.
+* Storing off-chain academic data.
 
-### Step 4: Run Merkle proof demo
+## FRONTEND RESPONSIBILITY
 
-```bash
-npx hardhat run scripts/demoMerkleProof.js --network localhost
-```
----
+The frontend provides pages for:
 
-## 🔄 System Workflow
+* Admin: add authorized issuer.
+* University: issue and revoke credentials.
+* Student: register, view credentials, generate proofs.
+* Verifier: verify credential status and proof.
+* Smoke test: quickly test backend endpoints.
 
-### Step 1: Add issuer
+## BASIC DEMO FLOW
 
-```text
-Admin → IssuerRegistry.addIssuer()
-```
+Recommended demo order:
 
-The system owner adds a university address into the issuer registry.
+1. Start PostgreSQL.
+2. Start local Hardhat blockchain.
+3. Deploy smart contracts.
+4. Start backend.
+5. Start frontend.
+6. Admin adds an authorized university issuer.
+7. Student registers wallet information.
+8. University issues a credential to the student.
+9. Student views credential.
+10. Student generates a proof for selected information.
+11. Verifier verifies the proof.
+12. University revokes the credential.
+13. Verifier checks again and sees that the credential is no longer valid.
 
----
+## EXPECTED RESULT
 
-### Step 2: Issue credential
+After the full flow:
 
-```text
-Issuer → CredentialRegistry.issueCredential()
-```
+* University issuer is authorized.
+* Student is registered.
+* Digital diploma credential is issued.
+* Credential verification data is stored on-chain.
+* Full transcript data is stored off-chain.
+* Student can generate selective Merkle proofs.
+* Verifier can verify selected academic information.
+* Revoked credentials become invalid.
 
-The authorized issuer issues a diploma credential for a holder.
+## IMPORTANT NOTES
 
-Stored data includes:
-- `credentialId`
-- `issuer`
-- `holder`
-- `merkleRoot`
-- `metadataHash`
+Current design notes:
 
----
-
-### Step 3: Verify credential
-
-```text
-Verifier → DiplomaVerifier.verifyCredentialStatus()
-```
-
-The verifier checks whether:
-- the credential exists
-- the credential is not revoked
-- the issuer is still authorized
-
----
-
-### Step 4: Revoke credential
-
-```text
-Issuer → CredentialRegistry.revokeCredential()
-```
-
-The issuer revokes an issued credential.
-
----
-
-### Step 5: Verify again
-
-```text
-Verifier → DiplomaVerifier.verifyCredentialStatus() → false
-```
-
-After revocation, the verifier should receive `false`.
-
----
-
-## 🌳 Merkle Tree and Selective Disclosure
-
-This system supports selective disclosure through a Merkle Tree design:
-
-- Each course/grade pair is represented as a leaf node
-- Only the `merkleRoot` is stored on-chain
-- The holder provides:
-  - the requested leaf data
-  - the corresponding Merkle proof
-
-This allows the holder to prove only specific academic information without revealing the full transcript.
-
----
-
-## 🔐 ECC Signature
-
-ECC signing is handled **off-chain**.
-
-Typical design:
-- The university signs the credential off-chain
-- The backend or verifier checks the signature
-- The smart contracts manage:
-  - issuer registry
-  - revocation status
-  - Merkle root storage
-
----
-## Course Structure (Sugestion)
-```json
-{
-  "studentId": "20220001",
-  "name": "Nguyen Van A",
-  "program": "Computer Science",
-  "courses": [
-    {
-      "courseId": "IT1000",
-      "courseName": "Introduction to Programming",
-      "semester": "2023-1",
-      "credits": 4.0,
-      "grade": "A"
-    },
-    {
-      "courseId": "IT2001",
-      "courseName": "Data Structures",
-      "semester": "2023-2",
-      "credits": 3.0,
-      "grade": "B+"
-    },
-    {
-      "courseId": "IT3002",
-      "courseName": "Computer Networks",
-      "semester": "2024-1",
-      "credits": 3.0,
-      "grade": "B+"
-    },
-    {
-      "courseId": "IT4003",
-      "courseName": "Cryptography",
-      "semester": "2024-2",
-      "credits": 3.0,
-      "grade": "A+"
-    }
-  ]
-}
-```
-
----
-
-## 📊 Implemented Features
-
-- ✅ Issuer registry
-- ✅ Credential issuance
-- ✅ Revocation list
-- ✅ Verification logic
-- ✅ Merkle root storage
-
-<!-- ---
-
-## 🚀 Future Improvements
-
-Possible extensions:
-- On-chain Merkle proof verification
-- On-chain ECC signature verification
-- Frontend interface for verification
-- Deployment to Sepolia testnet -->
-
----
-
-## ⚠️ Notes
-
-- This project currently uses the Hardhat local network
-- Do **not** use local test private keys on public networks
-
----
-
-## 🎯 Conclusion
-
-This system provides:
-
-- Secure digital diploma issuance
-- Efficient on-chain verification
-- Privacy-preserving data sharing
-- Revocation support for invalid credentials
+* Blockchain stores only verification-critical data.
+* PostgreSQL stores detailed academic data.
+* Merkle proof allows selective disclosure.
+* EIP-712 signature proves the issuer approved the credential.
+* Revocation status is stored on-chain.
+* University authentication in the backend should be improved for production use.
+* The current system is suitable for local demo and academic evaluation.

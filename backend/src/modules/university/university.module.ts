@@ -6,13 +6,14 @@ import { User } from '../../database/entities/user.entity';
 import { Credential } from '../../database/entities/credential.entity';
 import { Transcript } from '../../database/entities/transcript.entity';
 import { BlockchainModule } from '../../blockchain/blockchain.module';
+import { AdminController } from '../admin/admin.controller';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Credential, Transcript]),
     BlockchainModule,
   ],
-  controllers: [UniversityController],
+  controllers: [UniversityController, AdminController,],
   providers: [UniversityService],
 })
 export class UniversityModule {}

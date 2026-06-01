@@ -157,6 +157,23 @@ export class UniversityService {
 
   async revokeCredential(dto: RevokeCredentialDto) {
     const { credentialId } = dto;
+
+    const credential = await this.credentialRepository.findOne({
+      where: { credentialId },
+    });
+
+    if (!credential) {
+      throw new BadRequestException('Credential not found');
+    }
+
+    const wallet = this.contractService.getIssuerWallet();
+
+    if (ethers.getAddress(wallet.address) !== ethers.getAddress(credential.issuerAddress)) {
+      throw new BadRequestException(
+        'Configured issuer wallet is not the original issuer of this credential',
+      );
+    }
+
     await this.credentialService.revokeCredential(credentialId);
 
     await this.credentialRepository.update(
@@ -171,5 +188,10 @@ export class UniversityService {
     const { issuerAddress, issuerName } = dto;
     await this.issuerService.addIssuer(issuerAddress, issuerName);
     return { message: 'Issuer added' };
+  }
+
+  async removeIssuer(issuerAddress: string) {
+    await this.issuerService.removeIssuer(issuerAddress);
+    return { message: 'Issuer removed' };
   }
 }
