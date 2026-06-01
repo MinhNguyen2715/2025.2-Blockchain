@@ -286,6 +286,25 @@ export function Student() {
                   <p className="hint">This credential has no course rows.</p>
                 ) : (
                   <div className="check-list">
+                    <label className="check-row check-row--master">
+                      <input
+                        type="checkbox"
+                        checked={transcript.courses.every((c) => !!picked[c.courseId])}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const all: Record<string, boolean> = {};
+                            for (const c of transcript.courses) all[c.courseId] = true;
+                            setPicked(all);
+                          } else {
+                            setPicked({});
+                          }
+                        }}
+                      />
+                      <span>
+                        <strong>Select all courses</strong>{' '}
+                        <span className="hint">({transcript.courses.length} total)</span>
+                      </span>
+                    </label>
                     {transcript.courses.map((c) => (
                       <label className="check-row" key={c.courseId}>
                         <input
@@ -380,3 +399,4 @@ export function Student() {
     </div>
   );
 }
+

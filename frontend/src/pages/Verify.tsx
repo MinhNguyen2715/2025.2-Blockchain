@@ -1,212 +1,48 @@
 import { useRef, useState } from 'react';
 import { apiFetch, ApiResult } from '../lib/api';
 import { formatError } from '../lib/errors';
-import { parseBundle, CourseClaim } from '../lib/proof';
+import { parseBundle, ProofBundle } from '../lib/proof';
 
-type Mode = 'degree' | 'course' | 'status';
-
-const MODE_LABEL: Record<Mode, string> = {
-  degree: 'Verify degree information',
-  course: 'Verify one course',
-  status: 'Check revocation status',
-};
-
-type DegreeFields = {
-  credentialId: string;
-  degreeName: string;
-  major: string;
-  graduationYear: string;
-  proof: string;
-  signature: string;
-};
-
-type CourseFields = {
-  credentialId: string;
-  courseId: string;
-  courseName: string;
-  semester: string;
-  creditsScaled: string;
-  grade: string;
-  proof: string;
-  signature: string;
-};
-
-const DEGREE_INIT: DegreeFields = {
-  credentialId: '',
-  degreeName: '',
-  major: '',
-  graduationYear: '',
-  proof: '',
-  signature: '',
-};
-
-const COURSE_INIT: CourseFields = {
-  credentialId: '',
-  courseId: '',
-  courseName: '',
-  semester: '',
-  creditsScaled: '',
-  grade: '',
-  proof: '',
-  signature: '',
-};
-
-/** Split a multiline proof box into an array of hashes. */
-function parseProofLines(text: string): string[] {
-  return text
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-type Verdict = {
-  kind: 'ok' | 'bad' | 'warn';
-  headline: string;
-  bullets: string[];
-  /** Optional claim line shown beneath the headline (e.g. degree summary). */
-  claim?: string;
-};
-
-function interpret(mode: Mode, res: ApiResult): Verdict {
-  if ('error' in res) {
-    return {
-      kind: 'bad',
-      headline: '❌ Connection error',
-      bullets: [res.error || 'Could not reach the verification service.'],
-    };
-  }
-
-  if (!res.ok) {
-    // 404 → the credential doesn't exist on-chain
-    if (res.status === 404) {
-      return {
-        kind: 'warn',
-        headline: '❌ Invalid credential',
-        bullets: ['This credential does not exist on the blockchain.'],
-      };
-    }
-    // 4xx/5xx → render as bullet list (validation errors, missing fields, 401, etc.)
-    const e = formatError(res);
-    return {
-      kind: 'warn',
-      headline: e.headline,
-      bullets: e.bullets,
-    };
-  }
-
-  const body = (res.body && typeof res.body === 'object' ? res.body : {}) as Record<string, unknown>;
-
-  if (mode === 'status') {
-    if (body.revoked === true) {
-      return {
-        kind: 'bad',
-        headline: '❌ Invalid credential',
-        bullets: ['This credential has been revoked.'],
-      };
-    }
-    if (body.valid === true) {
-      return {
-        kind: 'ok',
-        headline: '✅ Valid credential',
-        bullets: [
-          'This credential exists on the blockchain.',
-          'It has not been revoked.',
-        ],
-      };
-    }
-    return {
-      kind: 'bad',
-      headline: '❌ Invalid credential',
-      bullets: ['The credential failed an on-chain status check.'],
-    };
-  }
-
-  // degree / course
-  if (body.valid === true) {
-    const lastBullet =
-      mode === 'degree'
-        ? 'The disclosed degree is included in the original transcript.'
-        : 'The disclosed course is included in the original transcript.';
-    const claim =
-      mode === 'degree'
-        ? [body.degreeName, body.major, body.graduationYear].filter(Boolean).join(' · ')
-        : undefined;
-    return {
-      kind: 'ok',
-      headline: '✅ Valid credential',
-      bullets: [
-        'This credential was issued by an authorized university.',
-        'The university digital signature is valid.',
-        'The credential has not been revoked.',
-        lastBullet,
-      ],
-      claim: claim || undefined,
-    };
-  }
-
-  return {
-    kind: 'bad',
-    headline: '❌ Invalid credential',
-    bullets: ['The privacy proof did not match the credential.'],
-  };
-}
-
-/** A single labeled text input. */
-function Field(props: {
+type LeafCheck = {
+  kind: 'degree' | 'course';
   label: string;
-  value: string;
-  onChange: (v: string) => void;
-  mono?: boolean;
-  type?: string;
-  placeholder?: string;
-}) {
-  return (
-    <label className="field">
-      {props.label}
-      <input
-        className={props.mono ? 'mono' : undefined}
-        value={props.value}
-        type={props.type ?? 'text'}
-        placeholder={props.placeholder}
-        onChange={(e) => props.onChange(e.target.value)}
-        spellCheck={false}
-      />
-    </label>
-  );
+  detail?: string;
+  ok: boolean;
+  reason?: string;
+};
+
+type Result =
+  | { kind: 'valid'; claim?: string; leaves: LeafCheck[] }
+  | { kind: 'invalid'; bullets: string[] }
+  | { kind: 'revoked' }
+  | { kind: 'notfound' }
+  | { kind: 'error'; bullets: string[] };
+
+function leafReasonFromRes(res: ApiResult): string {
+  if ('error' in res) return res.error || 'Network error';
+  if (res.ok) return '';
+  const e = formatError(res);
+  return e.bullets[0] || `HTTP ${res.status}`;
+}
+
+/** Summarize what the loaded bundle carries, for the "bundle loaded" card. */
+function bundleSummary(b: ProofBundle): string[] {
+  const parts: string[] = [];
+  if (b.degree) parts.push(`degree claim (${b.degree.degreeName} · ${b.degree.major} · ${b.degree.graduationYear})`);
+  if (b.courses && b.courses.length) {
+    parts.push(`${b.courses.length} course${b.courses.length === 1 ? '' : 's'}`);
+  }
+  if (!parts.length) parts.push('status check only (no degree or course claims)');
+  return parts;
 }
 
 export function Verify() {
-  const [mode, setMode] = useState<Mode>('degree');
-  const [degree, setDegree] = useState<DegreeFields>(DEGREE_INIT);
-  const [course, setCourse] = useState<CourseFields>(COURSE_INIT);
-  const [statusId, setStatusId] = useState('');
-
-  // When a bundle with multiple courses is loaded, let the verifier switch among them.
-  const [loadedCourses, setLoadedCourses] = useState<CourseClaim[] | null>(null);
-
-  const [loading, setLoading] = useState(false);
-  const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [bundle, setBundle] = useState<ProofBundle | null>(null);
   const [loadNote, setLoadNote] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [result, setResult] = useState<Result | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  function switchMode(next: Mode) {
-    setMode(next);
-    setVerdict(null);
-    setLoadNote(null);
-  }
-
-  function fillCourseFrom(c: CourseClaim, credentialId: string, signature: string) {
-    setCourse({
-      credentialId,
-      courseId: c.courseId,
-      courseName: c.courseName,
-      semester: c.semester,
-      creditsScaled: String(c.creditsScaled),
-      grade: c.grade,
-      proof: (c.proof ?? []).join('\n'),
-      signature,
-    });
-  }
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -215,32 +51,15 @@ export function Verify() {
     reader.onload = () => {
       try {
         const b = parseBundle(String(reader.result ?? ''));
-        setVerdict(null);
-        if (b.degree) {
-          setDegree({
-            credentialId: b.credentialId,
-            degreeName: b.degree.degreeName,
-            major: b.degree.major,
-            graduationYear: b.degree.graduationYear,
-            proof: (b.degreeProof ?? []).join('\n'),
-            signature: b.signature || '',
-          });
-        }
-        if (b.courses && b.courses.length) {
-          setLoadedCourses(b.courses);
-          fillCourseFrom(b.courses[0], b.credentialId, b.signature || '');
-        } else {
-          setLoadedCourses(null);
-        }
-        // Land the verifier on whatever the bundle actually carries.
-        const next: Mode = b.degree ? 'degree' : b.courses && b.courses.length ? 'course' : mode;
-        setMode(next);
-        const parts: string[] = [];
-        if (b.degree) parts.push('degree claim');
-        if (b.courses?.length) parts.push(`${b.courses.length} course${b.courses.length > 1 ? 's' : ''}`);
-        setLoadNote(`Loaded ${parts.join(' + ') || 'bundle'} from ${file.name}.`);
+        setBundle(b);
+        setLoadError(null);
+        setResult(null);
+        setLoadNote(`Loaded from ${file.name}.`);
       } catch (err) {
-        setLoadNote(`That file isn't a valid proof bundle: ${(err as Error).message}`);
+        setBundle(null);
+        setLoadNote(null);
+        setResult(null);
+        setLoadError(`That file isn't a valid proof bundle: ${(err as Error).message}`);
       }
     };
     reader.readAsText(file);
@@ -248,43 +67,135 @@ export function Verify() {
   }
 
   async function verify() {
-    setVerdict(null);
-    setLoading(true);
+    if (!bundle) return;
+    setVerifying(true);
+    setResult(null);
     try {
-      let res: ApiResult;
-      if (mode === 'status') {
-        res = await apiFetch(`/verify/status/${encodeURIComponent(statusId)}`);
-      } else if (mode === 'degree') {
-        res = await apiFetch('/verify/degree', {
+      // 1. Status check (existence + revocation) ─────────────
+      const statusRes = await apiFetch(
+        `/verify/status/${encodeURIComponent(bundle.credentialId)}`,
+      );
+      if ('error' in statusRes) {
+        setResult({
+          kind: 'error',
+          bullets: [statusRes.error || 'Could not reach the verification service.'],
+        });
+        return;
+      }
+      if (statusRes.status === 404) {
+        setResult({ kind: 'notfound' });
+        return;
+      }
+      if (!statusRes.ok) {
+        setResult({ kind: 'error', bullets: formatError(statusRes).bullets });
+        return;
+      }
+      const sBody = (statusRes.body && typeof statusRes.body === 'object'
+        ? statusRes.body
+        : {}) as { valid?: boolean; revoked?: boolean };
+      if (sBody.revoked === true) {
+        setResult({ kind: 'revoked' });
+        return;
+      }
+      if (sBody.valid !== true) {
+        setResult({
+          kind: 'invalid',
+          bullets: ['The credential failed an on-chain status check.'],
+        });
+        return;
+      }
+
+      // 2. Per-leaf verification ─────────────────────────────
+      const leaves: LeafCheck[] = [];
+
+      if (bundle.degree) {
+        const r = await apiFetch('/verify/degree', {
           method: 'POST',
           body: {
-            credentialId: degree.credentialId,
-            degreeName: degree.degreeName,
-            major: degree.major,
-            graduationYear: degree.graduationYear,
-            proof: parseProofLines(degree.proof),
-            signature: degree.signature,
+            credentialId: bundle.credentialId,
+            degreeName: bundle.degree.degreeName,
+            major: bundle.degree.major,
+            graduationYear: bundle.degree.graduationYear,
+            proof: bundle.degreeProof ?? [],
+            signature: bundle.signature,
           },
         });
-      } else {
-        res = await apiFetch('/verify/full', {
-          method: 'POST',
-          body: {
-            credentialId: course.credentialId,
-            courseId: course.courseId,
-            courseName: course.courseName,
-            semester: course.semester,
-            creditsScaled: Number(course.creditsScaled) || 0,
-            grade: course.grade,
-            proof: parseProofLines(course.proof),
-            signature: course.signature,
-          },
+        let ok = false;
+        let reason: string | undefined;
+        if ('error' in r || !r.ok) {
+          reason = leafReasonFromRes(r);
+        } else {
+          const b = (r.body && typeof r.body === 'object' ? r.body : {}) as { valid?: boolean };
+          ok = b.valid === true;
+          if (!ok) reason = 'The privacy proof did not match the credential.';
+        }
+        leaves.push({
+          kind: 'degree',
+          label: 'Degree',
+          detail: `${bundle.degree.degreeName} · ${bundle.degree.major} · ${bundle.degree.graduationYear}`,
+          ok,
+          reason,
         });
       }
-      setVerdict(interpret(mode, res));
+
+      for (const c of bundle.courses ?? []) {
+        const r = await apiFetch('/verify/full', {
+          method: 'POST',
+          body: {
+            credentialId: bundle.credentialId,
+            courseId: c.courseId,
+            courseName: c.courseName,
+            semester: c.semester,
+            creditsScaled: c.creditsScaled,
+            grade: c.grade,
+            proof: c.proof,
+            signature: bundle.signature,
+          },
+        });
+        let ok = false;
+        let reason: string | undefined;
+        if ('error' in r || !r.ok) {
+          reason = leafReasonFromRes(r);
+        } else {
+          const b = (r.body && typeof r.body === 'object' ? r.body : {}) as { valid?: boolean };
+          ok = b.valid === true;
+          if (!ok) reason = 'The privacy proof did not match the credential.';
+        }
+        leaves.push({
+          kind: 'course',
+          label: `Course ${c.courseId}`,
+          detail: `${c.courseName} · ${c.semester} · grade ${c.grade}`,
+          ok,
+          reason,
+        });
+      }
+
+      // 3. Aggregate ─────────────────────────────────────────
+      const failed = leaves.filter((l) => !l.ok);
+      if (failed.length > 0) {
+        const bullets = failed.map((l) =>
+          l.kind === 'degree'
+            ? `The privacy proof for the degree did not match the credential${l.reason && l.reason !== 'The privacy proof did not match the credential.' ? ` (${l.reason})` : ''}.`
+            : `The privacy proof for ${l.label.toLowerCase()} (${l.detail ?? ''}) did not match the credential${l.reason && l.reason !== 'The privacy proof did not match the credential.' ? ` (${l.reason})` : ''}.`,
+        );
+        setResult({ kind: 'invalid', bullets });
+        return;
+      }
+
+      const claim = bundle.degree
+        ? `${bundle.degree.degreeName} · ${bundle.degree.major} · ${bundle.degree.graduationYear}`
+        : undefined;
+      setResult({ kind: 'valid', claim, leaves });
     } finally {
-      setLoading(false);
+      setVerifying(false);
     }
+  }
+
+  function reset() {
+    setBundle(null);
+    setLoadNote(null);
+    setLoadError(null);
+    setResult(null);
   }
 
   return (
@@ -293,177 +204,148 @@ export function Verify() {
         <span className="eyebrow">Verifier</span>
         <h1>Verify a credential</h1>
         <p>
-          Load the proof a student shared with you (it fills the fields below), or enter the
-          claim by hand. Choose what you're checking.
+          Load the proof a student shared with you. The verification runs against the on-chain
+          registry and reveals only the information the student chose to disclose.
         </p>
       </div>
 
       <div className="panel">
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.2rem' }}>
-          <div className="segmented" role="tablist">
-            {(['degree', 'course', 'status'] as Mode[]).map((m) => (
-              <button
-                key={m}
-                className={mode === m ? 'active' : ''}
-                onClick={() => switchMode(m)}
-                role="tab"
-                aria-selected={mode === m}
-              >
-                {MODE_LABEL[m]}
-              </button>
-            ))}
-          </div>
+        <div className="proof-toolbar">
+          <button className="file-btn" onClick={() => fileRef.current?.click()}>
+            ⤓ Upload proof file…
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={onFile}
+            style={{ display: 'none' }}
+          />
+          <span className="hint">load the .json the student exported</span>
         </div>
 
-        {mode !== 'status' && (
-          <div className="proof-toolbar">
-            <button className="file-btn" onClick={() => fileRef.current?.click()}>
-              ⤓ Load proof file…
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/json,.json"
-              onChange={onFile}
-              style={{ display: 'none' }}
-            />
-            <span className="hint">load the .json the student exported, then verify</span>
+        {loadError && (
+          <div className="error-panel">
+            <div className="error-headline">Could not load that file</div>
+            <ul className="error-bullets">
+              <li>{loadError}</li>
+            </ul>
           </div>
         )}
 
-        {loadNote && (
-          <div className="privacy-note" style={{ marginBottom: '1rem' }}>
-            <span>📎</span>
-            <span>{loadNote}</span>
-          </div>
-        )}
-
-        {mode === 'status' && (
-          <label className="field">
-            Credential ID
-            <input
-              className="mono"
-              value={statusId}
-              onChange={(e) => setStatusId(e.target.value)}
-              placeholder="0x…"
-              spellCheck={false}
-            />
-          </label>
-        )}
-
-        {mode === 'degree' && (
-          <div className="form-grid">
-            <Field label="Credential ID" mono placeholder="0x…" value={degree.credentialId} onChange={(v) => setDegree({ ...degree, credentialId: v })} />
-            <Field label="Degree name" value={degree.degreeName} onChange={(v) => setDegree({ ...degree, degreeName: v })} />
-            <Field label="Major" value={degree.major} onChange={(v) => setDegree({ ...degree, major: v })} />
-            <Field label="Graduation year" value={degree.graduationYear} onChange={(v) => setDegree({ ...degree, graduationYear: v })} />
-            <label className="field span-2">
-              Privacy proof (one hash per line)
-              <textarea
-                className="mono"
-                value={degree.proof}
-                onChange={(e) => setDegree({ ...degree, proof: e.target.value })}
-                rows={Math.min(10, degree.proof.split('\n').length + 1)}
-                placeholder={'0x…\n0x…'}
-                spellCheck={false}
-              />
-            </label>
-            <label className="field span-2">
-              University digital signature
-              <input
-                className="mono"
-                value={degree.signature}
-                onChange={(e) => setDegree({ ...degree, signature: e.target.value })}
-                placeholder="0x…"
-                spellCheck={false}
-              />
-            </label>
-          </div>
-        )}
-
-        {mode === 'course' && (
+        {bundle && !result && (
           <>
-            {loadedCourses && loadedCourses.length > 1 && (
-              <label className="field">
-                Course in bundle
-                <select
-                  value={course.courseId}
-                  onChange={(e) => {
-                    const c = loadedCourses.find((x) => x.courseId === e.target.value);
-                    if (c) fillCourseFrom(c, course.credentialId, course.signature);
-                  }}
-                >
-                  {loadedCourses.map((c) => (
-                    <option key={c.courseId} value={c.courseId}>
-                      {c.courseId} — {c.courseName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <div className="form-grid">
-              <Field label="Credential ID" mono placeholder="0x…" value={course.credentialId} onChange={(v) => setCourse({ ...course, credentialId: v })} />
-              <Field label="Course ID" value={course.courseId} onChange={(v) => setCourse({ ...course, courseId: v })} />
-              <Field label="Course name" value={course.courseName} onChange={(v) => setCourse({ ...course, courseName: v })} />
-              <Field label="Semester" value={course.semester} onChange={(v) => setCourse({ ...course, semester: v })} />
-              <Field label="Credit" type="number" value={course.creditsScaled} onChange={(v) => setCourse({ ...course, creditsScaled: v })} />
-              <Field label="Grade" value={course.grade} onChange={(v) => setCourse({ ...course, grade: v })} />
-              <label className="field span-2">
-                Privacy proof (one hash per line)
-                <textarea
-                  className="mono"
-                  value={course.proof}
-                  onChange={(e) => setCourse({ ...course, proof: e.target.value })}
-                  rows={Math.min(10, course.proof.split('\n').length + 1)}
-                  placeholder={'0x…\n0x…'}
-                  spellCheck={false}
-                />
-              </label>
-              <label className="field span-2">
-                University digital signature
-                <input
-                  className="mono"
-                  value={course.signature}
-                  onChange={(e) => setCourse({ ...course, signature: e.target.value })}
-                  placeholder="0x…"
-                  spellCheck={false}
-                />
-              </label>
+            <div className="kv-section" style={{ marginTop: '0.6rem' }}>
+              <h3 className="kv-title">Bundle loaded</h3>
+              <dl className="kv-list">
+                <dt>File</dt>
+                <dd>{loadNote?.replace(/^Loaded from /, '').replace(/\.$/, '') ?? ''}</dd>
+                <dt>Credential ID</dt>
+                <dd className="mono break">{bundle.credentialId}</dd>
+                <dt>Contents</dt>
+                <dd>
+                  <ul className="role-bullets" style={{ margin: 0 }}>
+                    {bundleSummary(bundle).map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                </dd>
+              </dl>
+            </div>
+
+            <div className="actions" style={{ marginTop: '1.2rem' }}>
+              <button className="ghost" onClick={reset} disabled={verifying}>
+                Clear
+              </button>
+              <button className="btn lg" onClick={verify} disabled={verifying}>
+                {verifying ? 'Verifying…' : 'Verify'}
+              </button>
             </div>
           </>
         )}
 
-        {mode === 'degree' && (
-          <div className="privacy-note">
-            <span>🔒</span>
-            <span>
-              <strong>Privacy preserved.</strong> A degree check confirms only the degree, major,
-              and graduation year via a privacy proof. The transcript and grades are never
-              transmitted.
-            </span>
+        {result && result.kind === 'valid' && (
+          <div className="result-banner ok">
+            <span className="verdict">✅ Valid credential</span>
+            {result.claim && <span className="claims">{result.claim}</span>}
+            <ul className="banner-bullets">
+              <li>This credential was issued by an authorized university.</li>
+              <li>The university digital signature is valid.</li>
+              <li>The credential has not been revoked.</li>
+              <li>All disclosed information is included in the original transcript.</li>
+            </ul>
+
+            {result.leaves.length > 0 && (
+              <div className="kv-section" style={{ marginTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                <h3 className="kv-title">Disclosed information</h3>
+                <dl className="kv-list">
+                  {result.leaves.map((l, i) => (
+                    <FragmentRow key={i} label={l.label} detail={l.detail ?? ''} />
+                  ))}
+                </dl>
+              </div>
+            )}
           </div>
         )}
 
-        <div className="actions" style={{ marginTop: '1.2rem' }}>
-          <button className="btn lg" onClick={verify} disabled={loading}>
-            {loading ? 'Verifying…' : 'Verify'}
-          </button>
-        </div>
+        {result && result.kind === 'revoked' && (
+          <div className="result-banner bad">
+            <span className="verdict">❌ Invalid credential</span>
+            <ul className="banner-bullets">
+              <li>This credential has been revoked.</li>
+            </ul>
+          </div>
+        )}
 
-        {verdict && (
-          <div className={`result-banner ${verdict.kind}`}>
-            <span className="verdict">{verdict.headline}</span>
-            {verdict.claim && <span className="claims">{verdict.claim}</span>}
-            {verdict.bullets.length > 0 && (
-              <ul className="banner-bullets">
-                {verdict.bullets.map((b, i) => (
-                  <li key={i}>{b}</li>
-                ))}
-              </ul>
-            )}
+        {result && result.kind === 'notfound' && (
+          <div className="result-banner warn">
+            <span className="verdict">❌ Invalid credential</span>
+            <ul className="banner-bullets">
+              <li>This credential does not exist on the blockchain.</li>
+            </ul>
+          </div>
+        )}
+
+        {result && result.kind === 'invalid' && (
+          <div className="result-banner bad">
+            <span className="verdict">❌ Invalid credential</span>
+            <ul className="banner-bullets">
+              {result.bullets.map((b, i) => (
+                <li key={i}>{b}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {result && result.kind === 'error' && (
+          <div className="error-panel">
+            <div className="error-headline">Verification could not run</div>
+            <ul className="error-bullets">
+              {result.bullets.map((b, i) => (
+                <li key={i}>{b}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {result && (
+          <div className="actions" style={{ marginTop: '1rem' }}>
+            <button className="ghost" onClick={reset}>
+              Verify another
+            </button>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+/** Tiny helper to render a dt/dd pair inline. */
+function FragmentRow({ label, detail }: { label: string; detail: string }) {
+  return (
+    <>
+      <dt>{label}</dt>
+      <dd>{detail}</dd>
+    </>
   );
 }

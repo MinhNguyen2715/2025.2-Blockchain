@@ -137,7 +137,6 @@ export const ENDPOINTS: EndpointSpec[] = [
     group: 'university',
     method: 'POST',
     pathTemplate: '/university/issue',
-    adminKey: true,
     defaultBody: JSON.stringify(
       {
         holderAddress: ADDR_HOLDER,
@@ -170,9 +169,8 @@ export const ENDPOINTS: EndpointSpec[] = [
     group: 'university',
     method: 'POST',
     pathTemplate: '/university/revoke',
-    adminKey: true,
     defaultBody: JSON.stringify({ credentialId: BYTES32_ZERO }, null, 2),
-    description: 'Revoke a credential. Needs x-admin-api-key.',
+    description: 'Revoke a credential. No admin key required.',
   },
   {
     id: 'university-add-issuer',

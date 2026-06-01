@@ -4,6 +4,7 @@ import { Landing } from './pages/Landing';
 import { Verify } from './pages/Verify';
 import { Student } from './pages/Student';
 import { University } from './pages/University';
+import { Admin } from './pages/Admin';
 import { Smoke } from './pages/Smoke';
 
 export function App() {
@@ -19,6 +20,9 @@ export function App() {
       break;
     case '/university':
       page = <University />;
+      break;
+    case '/admin':
+      page = <Admin />;
       break;
     case '/smoke':
       page = <Smoke />;

@@ -4,12 +4,11 @@ import { formatError, ErrorView } from '../lib/errors';
 
 const ADDR_PLACEHOLDER = '0x0000000000000000000000000000000000000000';
 
-type Tab = 'issue' | 'revoke' | 'issuer';
+type Tab = 'issue' | 'revoke';
 
 const TAB_LABEL: Record<Tab, string> = {
   issue: 'Issue',
   revoke: 'Revoke',
-  issuer: 'Add issuer',
 };
 
 type Row = {
@@ -65,14 +64,12 @@ function ErrorPanel({ err }: { err: ErrorView }) {
   );
 }
 
-/** Read a string field from a JSON response (when the request succeeded). */
 function readSuccess(res: ApiResult): Record<string, unknown> {
   if ('error' in res || !res.ok) return {};
   return (res.body && typeof res.body === 'object' ? res.body : {}) as Record<string, unknown>;
 }
 
 export function University() {
-  const [adminKey, setAdminKey] = useState('');
   const [tab, setTab] = useState<Tab>('issue');
 
   // ── issue form ────────────────────────────────────────────────
@@ -83,10 +80,6 @@ export function University() {
   const [degreeName, setDegreeName] = useState('');
   const [major, setMajor] = useState('');
   const [graduationYear, setGraduationYear] = useState('');
-  // UI-only (not sent)
-  const [email, setEmail] = useState('');
-  const [classification, setClassification] = useState('');
-  const [issueDate, setIssueDate] = useState('');
   const [rows, setRows] = useState<Row[]>([{ ...EMPTY_ROW }]);
   const [previewing, setPreviewing] = useState(false);
   const [issuing, setIssuing] = useState(false);
@@ -95,17 +88,9 @@ export function University() {
 
   // ── revoke ───────────────────────────────────────────────────
   const [revokeId, setRevokeId] = useState('');
-  const [revokeReason, setRevokeReason] = useState('');
   const [revoking, setRevoking] = useState(false);
   const [revokeError, setRevokeError] = useState<ErrorView | null>(null);
   const [revokeSuccess, setRevokeSuccess] = useState<string | null>(null);
-
-  // ── add issuer ───────────────────────────────────────────────
-  const [newIssuerAddr, setNewIssuerAddr] = useState('');
-  const [newIssuerName, setNewIssuerName] = useState('');
-  const [addingIssuer, setAddingIssuer] = useState(false);
-  const [issuerError, setIssuerError] = useState<ErrorView | null>(null);
-  const [issuerSuccess, setIssuerSuccess] = useState<string | null>(null);
 
   // ── handlers ─────────────────────────────────────────────────
   function onCsv(e: React.ChangeEvent<HTMLInputElement>) {
@@ -149,7 +134,6 @@ export function University() {
       }));
     const res = await apiFetch('/university/issue', {
       method: 'POST',
-      adminKey,
       body: {
         holderAddress: holderAddress.trim(),
         issuerAddress: issuerAddress.trim(),
@@ -180,7 +164,6 @@ export function University() {
     setRevokeSuccess(null);
     const res = await apiFetch('/university/revoke', {
       method: 'POST',
-      adminKey,
       body: { credentialId: revokeId.trim() },
     });
     setRevoking(false);
@@ -191,58 +174,22 @@ export function University() {
     setRevokeSuccess('The credential has been revoked.');
   }
 
-  async function addIssuer() {
-    setAddingIssuer(true);
-    setIssuerError(null);
-    setIssuerSuccess(null);
-    const res = await apiFetch('/university/add-issuer', {
-      method: 'POST',
-      adminKey,
-      body: { issuerAddress: newIssuerAddr.trim(), issuerName: newIssuerName.trim() },
-    });
-    setAddingIssuer(false);
-    if ('error' in res || !res.ok) {
-      setIssuerError(formatError(res));
-      return;
-    }
-    setIssuerSuccess(`Authorized ${newIssuerName.trim() || newIssuerAddr.trim()}.`);
-  }
-
   // ── derived ──────────────────────────────────────────────────
   const transcriptRows = rows.filter((r) => r.courseId.trim());
 
   return (
     <div>
       <div className="page-head">
-        <span className="eyebrow">Issuer · admin</span>
+        <span className="eyebrow">Issuer</span>
         <h1>University console</h1>
         <p>
-          Issue and revoke credentials and authorize issuer wallets. Every action requires the
-          administration key.
-        </p>
-      </div>
-
-      {/* ── administration key ─────────────────────────────────── */}
-      <div className="panel">
-        <label className="field">
-          Administration key
-          <input
-            type="password"
-            value={adminKey}
-            onChange={(e) => setAdminKey(e.target.value)}
-            placeholder="(required — kept in memory only, never persisted)"
-            spellCheck={false}
-          />
-        </label>
-        <p className="hint">
-          The key lives in this tab's memory only. It is sent with each request and is gone on
-          reload.
+          Issue digital diplomas to your students and revoke ones that were issued in error.
         </p>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', margin: '1.4rem 0' }}>
         <div className="segmented" role="tablist">
-          {(['issue', 'revoke', 'issuer'] as Tab[]).map((t) => (
+          {(['issue', 'revoke'] as Tab[]).map((t) => (
             <button
               key={t}
               className={tab === t ? 'active' : ''}
@@ -275,10 +222,6 @@ export function University() {
                   Holder wallet address
                   <input className="mono" value={holderAddress} onChange={(e) => setHolderAddress(e.target.value)} placeholder={ADDR_PLACEHOLDER} spellCheck={false} />
                 </label>
-                <label className="field">
-                  Email <span className="ui-only">UI only</span>
-                  <input value={email} onChange={(e) => setEmail(e.target.value)} />
-                </label>
               </div>
 
               <p className="form-section-label">Degree</p>
@@ -295,23 +238,11 @@ export function University() {
                   Graduation year
                   <input value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)} />
                 </label>
-                <label className="field">
-                  Classification <span className="ui-only">UI only</span>
-                  <input value={classification} onChange={(e) => setClassification(e.target.value)} placeholder="e.g. Distinction" />
-                </label>
-                <label className="field">
-                  Issue date <span className="ui-only">UI only</span>
-                  <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
-                </label>
                 <label className="field span-2">
                   Issuer wallet address
                   <input className="mono" value={issuerAddress} onChange={(e) => setIssuerAddress(e.target.value)} placeholder={ADDR_PLACEHOLDER} spellCheck={false} />
                 </label>
               </div>
-              <p className="hint">
-                Fields marked <span className="ui-only">UI only</span> aren't accepted by the
-                backend and are not stored on-chain or in the database.
-              </p>
 
               <p className="form-section-label" style={{ marginTop: '1.4rem' }}>
                 Transcript
@@ -487,14 +418,6 @@ export function University() {
             Credential ID
             <input className="mono" value={revokeId} onChange={(e) => setRevokeId(e.target.value)} placeholder="0x…" spellCheck={false} />
           </label>
-          <label className="field">
-            Reason <span className="ui-only">UI only</span>
-            <input value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} placeholder="e.g. issued in error" />
-          </label>
-          <p className="hint">
-            The backend records only the credential ID. The reason is for your own records and is
-            not stored.
-          </p>
           {revokeError && <ErrorPanel err={revokeError} />}
           {revokeSuccess && (
             <div className="result-banner ok">
@@ -505,32 +428,6 @@ export function University() {
           <div className="actions" style={{ marginTop: '1.2rem' }}>
             <button className="btn lg" onClick={revoke} disabled={revoking}>
               {revoking ? 'Revoking…' : 'Revoke credential'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── add issuer ─────────────────────────────────────────── */}
-      {tab === 'issuer' && (
-        <div className="panel">
-          <label className="field">
-            Issuer wallet address
-            <input className="mono" value={newIssuerAddr} onChange={(e) => setNewIssuerAddr(e.target.value)} placeholder={ADDR_PLACEHOLDER} spellCheck={false} />
-          </label>
-          <label className="field">
-            Issuer name
-            <input value={newIssuerName} onChange={(e) => setNewIssuerName(e.target.value)} placeholder="e.g. Hanoi University of Science and Technology" />
-          </label>
-          {issuerError && <ErrorPanel err={issuerError} />}
-          {issuerSuccess && (
-            <div className="result-banner ok">
-              <span className="verdict">✅ Issuer authorized</span>
-              <span className="claims">{issuerSuccess}</span>
-            </div>
-          )}
-          <div className="actions" style={{ marginTop: '1.2rem' }}>
-            <button className="btn lg" onClick={addIssuer} disabled={addingIssuer}>
-              {addingIssuer ? 'Authorizing…' : 'Authorize issuer'}
             </button>
           </div>
         </div>

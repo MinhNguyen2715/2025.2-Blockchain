@@ -823,6 +823,14 @@ button.reset {
   color: var(--muted-2);
   font-weight: 400;
 }
+.check-row--master {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.55rem;
+  margin-bottom: 0.25rem;
+}
+.check-row--master strong {
+  color: var(--mauve);
+}
 
 /* credential list */
 .cred-list {
