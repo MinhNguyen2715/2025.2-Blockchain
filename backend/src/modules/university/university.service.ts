@@ -47,7 +47,7 @@ export class UniversityService {
     const normalizedIssuer = this.normalizeAddress(issuerAddress);
     const normalizedHolder = this.normalizeAddress(holderAddress);
 
-    const wallet = this.contractService.getWallet();
+    const wallet = this.contractService.getIssuerWallet();
 
     if (!wallet) {
       throw new BadRequestException('Backend signer wallet is not configured');
@@ -101,27 +101,51 @@ export class UniversityService {
     );
 
     await this.dataSource.transaction(async (manager) => {
-    const credential = manager.create(Credential, {
-      credentialId,
-      holderAddress: normalizedHolder,
-      issuerAddress: normalizedIssuer,
-      merkleRoot,
-      metadataHash,
-      signature,
+      const userRepository = manager.getRepository(User);
+      const credentialRepository = manager.getRepository(Credential);
+      const transcriptRepository = manager.getRepository(Transcript);
+
+      let holder = await userRepository.findOne({
+        where: {
+          walletAddress: normalizedHolder,
+        },
+      });
+
+      if (!holder) {
+        holder = userRepository.create({
+          walletAddress: normalizedHolder,
+          name: studentName,
+          role: UserRole.STUDENT,
+        });
+      } else {
+        holder.name = studentName;
+        holder.role = UserRole.STUDENT;
+      }
+
+      holder = await userRepository.save(holder);
+
+      const credential = credentialRepository.create({
+        credentialId,
+        holderAddress: normalizedHolder,
+        issuerAddress: normalizedIssuer,
+        merkleRoot,
+        metadataHash,
+        signature,
+        holder,
+      });
+
+      await credentialRepository.save(credential);
+
+      const transcriptRecord = transcriptRepository.create({
+        credentialId,
+        degree,
+        courses: transcript,
+        studentId,
+        studentName,
+      });
+
+      await transcriptRepository.save(transcriptRecord);
     });
-
-    await manager.save(credential);
-
-    const transcriptRecord = manager.create(Transcript, {
-      credentialId,
-      degree,
-      courses: transcript,
-      studentId,
-      studentName,
-    });
-
-    await manager.save(transcriptRecord);
-  });
 
     return {
       credentialId,

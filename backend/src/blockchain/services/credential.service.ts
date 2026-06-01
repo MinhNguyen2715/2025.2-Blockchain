@@ -15,9 +15,8 @@ export class CredentialService {
     signature: string,
   ): Promise<string> {
     try {
-      const wallet = this.contractService.getWallet();
-      // ethers v6: BaseContract.connect() loses the string-indexer Proxy typing
-      // that Contract has, so cast it back so TS lets us call dynamic methods.
+      const wallet = this.contractService.getIssuerWallet();
+
       const contract = this.contractService
         .getCredentialRegistry()
         .connect(wallet) as Contract;
@@ -35,14 +34,17 @@ export class CredentialService {
       return receipt.hash;
     } catch (error: any) {
       throw new BadRequestException(
-        `Blockchain issueCredential failed: ${error?.reason || error?.message || String(error)}`,
+        `Blockchain issueCredential failed: ${
+          error?.reason || error?.message || String(error)
+        }`,
       );
     }
   }
 
   async revokeCredential(credentialId: string): Promise<string> {
     try {
-      const wallet = this.contractService.getWallet();
+      const wallet = this.contractService.getIssuerWallet();
+
       const contract = this.contractService
         .getCredentialRegistry()
         .connect(wallet) as Contract;
@@ -53,7 +55,9 @@ export class CredentialService {
       return receipt.hash;
     } catch (error: any) {
       throw new BadRequestException(
-        `Blockchain revokeCredential failed: ${error?.reason || error?.message || String(error)}`,
+        `Blockchain revokeCredential failed: ${
+          error?.reason || error?.message || String(error)
+        }`,
       );
     }
   }
@@ -63,7 +67,9 @@ export class CredentialService {
   }
 
   async credentialExists(credentialId: string): Promise<boolean> {
-    return this.contractService.getCredentialRegistry().credentialExists(credentialId);
+    return this.contractService
+      .getCredentialRegistry()
+      .credentialExists(credentialId);
   }
 
   async isRevoked(credentialId: string): Promise<boolean> {

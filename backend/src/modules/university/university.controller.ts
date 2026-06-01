@@ -9,8 +9,7 @@ import { AdminApiKeyGuard } from '../../shared/guards/admin-api-key.guard';
 @Controller('university')
 export class UniversityController {
   constructor(private readonly universityService: UniversityService) {}
-  
-  @UseGuards(AdminApiKeyGuard)
+
   @Post('issue')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Issue credential to a student' })
@@ -19,8 +18,6 @@ export class UniversityController {
   async issueCredential(@Body() dto: IssueCredentialDto) {
     return this.universityService.issueCredential(dto);
   }
-
-  @UseGuards(AdminApiKeyGuard)
   @Post('revoke')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Revoke a credential' })
