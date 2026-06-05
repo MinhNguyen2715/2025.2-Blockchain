@@ -161,7 +161,14 @@ Run:
 ```
 .\run-local.ps1
 ```
-Wait until Hardhat, backend, and frontend are running.
+The script will automatically check the required local tools and install missing prerequisites when possible. It also installs the project dependencies for the root project, backend, and frontend.
+
+If automatic installation is blocked or fails because of permissions, missing winget, Windows policy, or PostgreSQL setup requirements, install the missing tools manually and run the script again.
+
+After startup, open:
+- Frontend: http://localhost:5173
+- Backend API docs: http://localhost:3000/api/docs
+- Hardhat RPC: http://127.0.0.1:8545
 
 ### Step 2: Check smart contract deployment
 

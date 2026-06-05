@@ -1,22 +1,17 @@
 import { network } from "hardhat";
 import fs from "fs";
+import { LOCAL_CONFIG } from "./localConfig.js";
 
-const ISSUER_ADDRESS = "0x70997970c51812dc3a010c7d01b50e0d17dc79c8";
-const ISSUER_NAME = "Hanoi University of Science and Technology";
+const DEPLOYMENT_FILE = "./deployments/localhost.json";
 
 async function main() {
   const { ethers } = await network.connect();
 
-  if (!fs.existsSync("./deployments/localhost.json")) {
-    throw new Error(
-      "Missing deployments/localhost.json. Run npm run deploy:local first.",
-    );
+  if (!fs.existsSync(DEPLOYMENT_FILE)) {
+    throw new Error("Missing deployments/localhost.json. Run npm run deploy:local first.");
   }
 
-  const deployments = JSON.parse(
-    fs.readFileSync("./deployments/localhost.json", "utf8"),
-  );
-
+  const deployments = JSON.parse(fs.readFileSync(DEPLOYMENT_FILE, "utf8"));
   const issuerRegistryAddress = deployments.IssuerRegistry;
 
   if (!issuerRegistryAddress) {
@@ -25,11 +20,8 @@ async function main() {
 
   const [owner] = await ethers.getSigners();
 
-  console.log("Authorizing demo issuer...");
-  console.log("Owner:", owner.address);
-  console.log("IssuerRegistry:", issuerRegistryAddress);
-  console.log("Issuer:", ISSUER_ADDRESS);
-  console.log("Issuer name:", ISSUER_NAME);
+  const issuerAddress = LOCAL_CONFIG.wallets.issuerAddress;
+  const issuerName = LOCAL_CONFIG.demoIssuer.name;
 
   const issuerRegistry = await ethers.getContractAt(
     "IssuerRegistry",
@@ -37,11 +29,17 @@ async function main() {
     owner,
   );
 
-  try {
-    const tx = await issuerRegistry.addIssuer(ISSUER_ADDRESS, ISSUER_NAME);
-    await tx.wait();
+  console.log("");
+  console.log("Authorizing demo issuer...");
+  console.log("Owner:          ", owner.address);
+  console.log("IssuerRegistry: ", issuerRegistryAddress);
+  console.log("Issuer:         ", issuerAddress);
+  console.log("Issuer name:    ", issuerName);
 
-    console.log("Demo issuer authorized successfully.");
+  try {
+    const tx = await issuerRegistry.addIssuer(issuerAddress, issuerName);
+    await tx.wait();
+    console.log("Demo issuer authorized.");
   } catch (error) {
     const message = String(error?.shortMessage || error?.message || error);
 
@@ -50,12 +48,14 @@ async function main() {
       message.includes("exists") ||
       message.includes("authorized")
     ) {
-      console.log("Demo issuer already authorized. Continue.");
+      console.log("Demo issuer is already authorized. Continue.");
       return;
     }
 
     throw error;
   }
+
+  console.log("");
 }
 
 main().catch((error) => {

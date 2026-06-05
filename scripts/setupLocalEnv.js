@@ -1,26 +1,13 @@
 import fs from "fs";
 import path from "path";
+import { LOCAL_CONFIG } from "./localConfig.js";
 
 const ROOT = process.cwd();
-
 const DEPLOYMENT_FILE = path.join(ROOT, "deployments", "localhost.json");
+
+const ROOT_ENV = path.join(ROOT, ".env");
 const BACKEND_ENV = path.join(ROOT, "backend", ".env");
-const FRONTEND_ENV = path.join(ROOT, "frontend", ".env");
-
-const ADMIN_PRIVATE_KEY =
-  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-
-const ISSUER_PRIVATE_KEY =
-  "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
-
-const ADMIN_API_KEY = "123456";
-
-const DEMO = {
-  adminAddress: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
-  issuerAddress: "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
-  holderAddress: "0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc",
-  verifierAddress: "0x90f79bf6eb2c4f870365e785982e1f101e93b906",
-};
+const FRONTEND_ENV = path.join(ROOT, "frontend", ".env.local");
 
 function readJson(filePath) {
   if (!fs.existsSync(filePath)) {
@@ -44,9 +31,7 @@ function parseEnv(content) {
     const key = line.slice(0, index).trim();
     const value = line.slice(index + 1).trim();
 
-    if (key) {
-      env[key] = value;
-    }
+    if (key) env[key] = value;
   }
 
   return env;
@@ -58,6 +43,12 @@ function readEnv(filePath) {
 }
 
 function writeEnv(filePath, env, preferredOrder) {
+  const dir = path.dirname(filePath);
+
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   const lines = [];
 
   for (const key of preferredOrder) {
@@ -89,108 +80,130 @@ if (!issuerRegistryAddress || !credentialRegistryAddress || !diplomaVerifierAddr
   throw new Error("Invalid deployments/localhost.json");
 }
 
-const existingBackendEnv = readEnv(BACKEND_ENV);
+const { database, server, apiKeys, wallets } = LOCAL_CONFIG;
+
+const rootEnv = {
+  ...readEnv(ROOT_ENV),
+  NETWORK: "localhost",
+  BLOCKCHAIN_RPC_URL: server.rpcUrl,
+  ADMIN_API_KEY: apiKeys.admin,
+  ISSUER_API_KEY: apiKeys.issuer,
+  DEMO_ADMIN_ADDRESS: wallets.adminAddress,
+  DEMO_ISSUER_ADDRESS: wallets.issuerAddress,
+  DEMO_HOLDER_ADDRESS: wallets.holderAddress,
+  DEMO_VERIFIER_ADDRESS: wallets.verifierAddress,
+};
 
 const backendEnv = {
-  ...existingBackendEnv,
+  ...readEnv(BACKEND_ENV),
 
-  PORT: existingBackendEnv.PORT || "3000",
+  NODE_ENV: "development",
+  PORT: server.backendPort,
 
-  DB_HOST: existingBackendEnv.DB_HOST || "localhost",
-  DB_PORT: existingBackendEnv.DB_PORT || "5432",
-  DB_USERNAME: existingBackendEnv.DB_USERNAME || "postgres",
-  DB_PASSWORD: "123456",
-  DB_NAME: existingBackendEnv.DB_NAME || "diploma",
+  DB_HOST: database.host,
+  DB_PORT: database.port,
+  DB_USERNAME: database.username,
+  DB_PASSWORD: database.password,
+  DB_NAME: database.name,
 
-  BLOCKCHAIN_RPC_URL: "http://127.0.0.1:8545",
+  BLOCKCHAIN_RPC_URL: server.rpcUrl,
 
-  ADMIN_API_KEY,
+  ADMIN_API_KEY: apiKeys.admin,
+  ISSUER_API_KEY: apiKeys.issuer,
 
-  ADMIN_PRIVATE_KEY,
-  ISSUER_PRIVATE_KEY,
-
-  // Keep for backward compatibility.
-  // New backend logic should use ISSUER_PRIVATE_KEY for Issue/Revoke.
-  UNIVERSITY_PRIVATE_KEY: ISSUER_PRIVATE_KEY,
+  ADMIN_PRIVATE_KEY: wallets.adminPrivateKey,
+  ISSUER_PRIVATE_KEY: wallets.issuerPrivateKey,
+  UNIVERSITY_PRIVATE_KEY: wallets.issuerPrivateKey,
 
   ISSUER_REGISTRY_ADDRESS: issuerRegistryAddress,
   CREDENTIAL_REGISTRY_ADDRESS: credentialRegistryAddress,
   DIPLOMA_VERIFIER_ADDRESS: diplomaVerifierAddress,
 
-  DEMO_ADMIN_ADDRESS: DEMO.adminAddress,
-  DEMO_ISSUER_ADDRESS: DEMO.issuerAddress,
-  DEMO_HOLDER_ADDRESS: DEMO.holderAddress,
-  DEMO_VERIFIER_ADDRESS: DEMO.verifierAddress,
+  DEMO_ADMIN_ADDRESS: wallets.adminAddress,
+  DEMO_ISSUER_ADDRESS: wallets.issuerAddress,
+  DEMO_HOLDER_ADDRESS: wallets.holderAddress,
+  DEMO_VERIFIER_ADDRESS: wallets.verifierAddress,
 
-  FRONTEND_URL: "http://localhost:5173",
+  FRONTEND_URL: server.frontendUrl,
 };
 
-// Remove old switching mode if it exists.
-delete backendEnv.DEMO_SIGNER_MODE;
+const frontendEnv = {
+  ...readEnv(FRONTEND_ENV),
+
+  VITE_API_BASE: server.apiBase,
+  VITE_ADMIN_API_KEY: apiKeys.admin,
+  VITE_ISSUER_API_KEY: apiKeys.issuer,
+
+  VITE_DEMO_ADMIN_ADDRESS: wallets.adminAddress,
+  VITE_DEMO_ISSUER_ADDRESS: wallets.issuerAddress,
+  VITE_DEMO_HOLDER_ADDRESS: wallets.holderAddress,
+  VITE_DEMO_VERIFIER_ADDRESS: wallets.verifierAddress,
+};
+
+writeEnv(ROOT_ENV, rootEnv, [
+  "NETWORK",
+  "BLOCKCHAIN_RPC_URL",
+  "ADMIN_API_KEY",
+  "ISSUER_API_KEY",
+  "DEMO_ADMIN_ADDRESS",
+  "DEMO_ISSUER_ADDRESS",
+  "DEMO_HOLDER_ADDRESS",
+  "DEMO_VERIFIER_ADDRESS",
+]);
 
 writeEnv(BACKEND_ENV, backendEnv, [
+  "NODE_ENV",
   "PORT",
-
   "DB_HOST",
   "DB_PORT",
   "DB_USERNAME",
   "DB_PASSWORD",
   "DB_NAME",
-
   "BLOCKCHAIN_RPC_URL",
-
   "ADMIN_API_KEY",
-
+  "ISSUER_API_KEY",
   "ADMIN_PRIVATE_KEY",
   "ISSUER_PRIVATE_KEY",
   "UNIVERSITY_PRIVATE_KEY",
-
   "ISSUER_REGISTRY_ADDRESS",
   "CREDENTIAL_REGISTRY_ADDRESS",
   "DIPLOMA_VERIFIER_ADDRESS",
-
   "DEMO_ADMIN_ADDRESS",
   "DEMO_ISSUER_ADDRESS",
   "DEMO_HOLDER_ADDRESS",
   "DEMO_VERIFIER_ADDRESS",
-
   "FRONTEND_URL",
 ]);
-
-const existingFrontendEnv = readEnv(FRONTEND_ENV);
-
-const frontendEnv = {
-  ...existingFrontendEnv,
-  VITE_API_BASE: "http://localhost:3000/api",
-  VITE_ADMIN_API_KEY: ADMIN_API_KEY,
-};
 
 writeEnv(FRONTEND_ENV, frontendEnv, [
   "VITE_API_BASE",
   "VITE_ADMIN_API_KEY",
+  "VITE_ISSUER_API_KEY",
+  "VITE_DEMO_ADMIN_ADDRESS",
+  "VITE_DEMO_ISSUER_ADDRESS",
+  "VITE_DEMO_HOLDER_ADDRESS",
+  "VITE_DEMO_VERIFIER_ADDRESS",
 ]);
 
 console.log("");
-console.log("Local env files updated successfully.");
+console.log("Local environment files updated.");
 console.log("");
-console.log("backend/.env");
-console.log("  ADMIN_API_KEY=123456");
-console.log("  ADMIN_PRIVATE_KEY=Account #0 / Admin / Owner");
-console.log("  ISSUER_PRIVATE_KEY=Account #1 / University / Issuer");
-console.log("  UNIVERSITY_PRIVATE_KEY=Account #1 / Backward compatibility");
-console.log("  ISSUER_REGISTRY_ADDRESS =", issuerRegistryAddress);
-console.log("  CREDENTIAL_REGISTRY_ADDRESS =", credentialRegistryAddress);
-console.log("  DIPLOMA_VERIFIER_ADDRESS =", diplomaVerifierAddress);
+console.log("Root env:     .env");
+console.log("Backend env:  backend/.env");
+console.log("Frontend env: frontend/.env.local");
 console.log("");
-console.log("frontend/.env");
-console.log("  VITE_API_BASE=http://localhost:3000/api");
-console.log("  VITE_ADMIN_API_KEY=123456");
+console.log("Contracts:");
+console.log(" IssuerRegistry:    ", issuerRegistryAddress);
+console.log(" CredentialRegistry:", credentialRegistryAddress);
+console.log(" DiplomaVerifier:   ", diplomaVerifierAddress);
+console.log("");
+console.log("Demo keys:");
+console.log(" Admin API key: ", apiKeys.admin);
+console.log(" Issuer API key:", apiKeys.issuer);
 console.log("");
 console.log("Demo accounts:");
-console.log("  Admin / Owner:       ", DEMO.adminAddress);
-console.log("  University / Issuer: ", DEMO.issuerAddress);
-console.log("  Student / Holder:    ", DEMO.holderAddress);
-console.log("  Verifier / Employer: ", DEMO.verifierAddress);
-console.log("");
-console.log("No .env switching is needed anymore.");
+console.log(" Admin / Owner:      ", wallets.adminAddress);
+console.log(" University / Issuer:", wallets.issuerAddress);
+console.log(" Student / Holder:   ", wallets.holderAddress);
+console.log(" Verifier:           ", wallets.verifierAddress);
 console.log("");

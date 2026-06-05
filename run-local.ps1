@@ -3,7 +3,8 @@ param(
   [string]$PostgresPassword = "123456",
   [string]$AdminApiKey = "123456",
   [string]$IssuerApiKey = "demo-issuer-key",
-  [switch]$OpenPgAdmin
+  [switch]$OpenPgAdmin,
+  [switch]$NoAutoInstallPrerequisites
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +12,12 @@ $ErrorActionPreference = "Stop"
 function Write-Step($Message) {
   Write-Host ""
   Write-Host "==> $Message" -ForegroundColor Cyan
+}
+
+function Require-Command($Name, $Message) {
+  if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+    throw "$Name was not found. $Message"
+  }
 }
 
 function Start-NewTerminal($Title, $Command) {
@@ -65,259 +72,91 @@ function Wait-HttpGet($Url, $Seconds = 40) {
   return $false
 }
 
-function Add-OrUpdateEnvLine($FilePath, $Key, $Value) {
-  if (-not (Test-Path $FilePath)) {
-    New-Item -ItemType File -Path $FilePath -Force | Out-Null
-  }
+function Add-PostgresToPath {
+  $possiblePgBins = @(
+    "$env:ProgramFiles\PostgreSQL\18\bin",
+    "$env:ProgramFiles\PostgreSQL\17\bin",
+    "$env:ProgramFiles\PostgreSQL\16\bin",
+    "$env:ProgramFiles\PostgreSQL\15\bin",
+    "$env:ProgramFiles\PostgreSQL\14\bin"
+  )
 
-  $content = Get-Content $FilePath -Raw -ErrorAction SilentlyContinue
+  $pgBin = $possiblePgBins |
+    Where-Object { Test-Path "$_\psql.exe" } |
+    Select-Object -First 1
 
-  if ($null -eq $content) {
-    $content = ""
-  }
-
-  $escapedKey = [regex]::Escape($Key)
-
-  if ($content -match "(?m)^$escapedKey=") {
-    $content = $content -replace "(?m)^$escapedKey=.*$", "$Key=$Value"
-  } else {
-    if ($content.Length -gt 0 -and -not $content.EndsWith("`n")) {
-      $content += "`r`n"
+  if ($pgBin) {
+    if (-not ($env:Path -like "*$pgBin*")) {
+      $env:Path = "$pgBin;$env:Path"
     }
-    $content += "$Key=$Value`r`n"
+
+    Write-Host "PostgreSQL CLI found: $pgBin"
+  } else {
+    Write-Warning "PostgreSQL CLI was not found. Make sure psql and createdb are in PATH."
+  }
+}
+
+function Start-PostgresIfPossible($ServiceName) {
+  if ([string]::IsNullOrWhiteSpace($ServiceName)) {
+    try {
+      $services = @(
+        Get-CimInstance Win32_Service -Filter "Name LIKE '%postgres%' OR DisplayName LIKE '%PostgreSQL%'" |
+          Select-Object Name, DisplayName, State
+      )
+
+      if ($services.Count -gt 0) {
+        $ServiceName = $services[0].Name
+        Write-Host "Detected PostgreSQL service: $ServiceName"
+      }
+    } catch {
+      Write-Warning "Could not detect PostgreSQL service."
+    }
   }
 
-  Set-Content -Path $FilePath -Value $content -Encoding UTF8
+  if (-not [string]::IsNullOrWhiteSpace($ServiceName)) {
+    try {
+      $service = Get-Service -Name $ServiceName -ErrorAction Stop
+
+      if ($service.Status -ne "Running") {
+        Start-Service -Name $ServiceName
+        Start-Sleep -Seconds 3
+        Write-Host "PostgreSQL service started."
+      } else {
+        Write-Host "PostgreSQL service is already running."
+      }
+    } catch {
+      Write-Warning "Could not start/check PostgreSQL service: $ServiceName"
+      Write-Warning $_.Exception.Message
+      Write-Warning "Start PostgreSQL manually if database creation fails."
+    }
+  }
 }
 
-# ------------------------------------------------------------
-# Resolve project root
-# ------------------------------------------------------------
+function Ensure-Database($Password) {
+  $env:PGPASSWORD = $Password
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-
-# If this script is inside /scripts, project root is parent folder.
-# If this script is already in project root, use current script folder.
-if ((Split-Path -Leaf $ScriptDir) -eq "scripts") {
-  $Root = Split-Path -Parent $ScriptDir
-} else {
-  $Root = $ScriptDir
-}
-
-Set-Location $Root
-
-Write-Step "Project root: $Root"
-
-if (-not (Test-Path "$Root\package.json")) {
-  throw "package.json not found in project root: $Root. Please place this script in the project root or scripts folder."
-}
-
-if (-not (Test-Path "$Root\backend")) {
-  throw "backend folder not found."
-}
-
-if (-not (Test-Path "$Root\frontend")) {
-  throw "frontend folder not found."
-}
-
-# ------------------------------------------------------------
-# PostgreSQL CLI tools
-# ------------------------------------------------------------
-
-Write-Step "Checking PostgreSQL CLI tools"
-
-$possiblePgBins = @(
-  "$env:ProgramFiles\PostgreSQL\18\bin",
-  "$env:ProgramFiles\PostgreSQL\17\bin",
-  "$env:ProgramFiles\PostgreSQL\16\bin",
-  "$env:ProgramFiles\PostgreSQL\15\bin",
-  "$env:ProgramFiles\PostgreSQL\14\bin"
-)
-
-$pgBin = $possiblePgBins |
-  Where-Object { Test-Path "$_\psql.exe" } |
-  Select-Object -First 1
-
-if ($pgBin) {
-  $env:Path = "$pgBin;$env:Path"
-  Write-Host "Detected PostgreSQL bin: $pgBin"
-} else {
-  Write-Warning "PostgreSQL bin folder not found. psql/createdb may fail if they are not in PATH."
-}
-
-# ------------------------------------------------------------
-# PostgreSQL service
-# ------------------------------------------------------------
-
-Write-Step "Checking PostgreSQL service"
-
-if ([string]::IsNullOrWhiteSpace($PostgresServiceName)) {
   try {
-    $pgServices = @(
-      Get-CimInstance Win32_Service -Filter "Name LIKE '%postgres%' OR DisplayName LIKE '%PostgreSQL%'" |
-        Select-Object Name, DisplayName, State
-    )
+    $dbExists = & psql -U postgres -h localhost -tAc "SELECT 1 FROM pg_database WHERE datname='diploma';" 2>$null
 
-    if ($pgServices.Count -gt 0) {
-      $PostgresServiceName = $pgServices[0].Name
-      Write-Host "Detected PostgreSQL service: $PostgresServiceName"
+    if ($dbExists.Trim() -eq "1") {
+      Write-Host "Database 'diploma' already exists."
     } else {
-      Write-Warning "No PostgreSQL Windows service detected."
-      Write-Warning "If PostgreSQL is installed manually, start it yourself."
+      & createdb -U postgres -h localhost diploma
+      Write-Host "Database 'diploma' created."
     }
   } catch {
-    Write-Warning "Could not auto-detect PostgreSQL service."
-    Write-Warning $_.Exception.Message
+    Write-Warning "Could not create/check database automatically."
+    Write-Warning "Manual fix:"
+    Write-Warning "1. Open pgAdmin or psql."
+    Write-Warning "2. Create database manually: CREATE DATABASE diploma;"
+    Write-Warning "3. Run this script again."
   }
 }
 
-if (-not [string]::IsNullOrWhiteSpace($PostgresServiceName)) {
-  try {
-    $service = Get-Service -Name $PostgresServiceName -ErrorAction Stop
-
-    if ($service.Status -ne "Running") {
-      Write-Step "Starting PostgreSQL service: $PostgresServiceName"
-      Start-Service -Name $PostgresServiceName
-      Start-Sleep -Seconds 3
-    } else {
-      Write-Host "PostgreSQL service is already running."
-    }
-  } catch {
-    Write-Warning "Could not start/check PostgreSQL service: $PostgresServiceName"
-    Write-Warning $_.Exception.Message
-    Write-Warning "You can start PostgreSQL manually, then run this script again."
+function Open-PgAdminIfRequested {
+  if (-not $OpenPgAdmin) {
+    return
   }
-}
-
-# ------------------------------------------------------------
-# Create database
-# ------------------------------------------------------------
-
-Write-Step "Creating database 'diploma' if possible"
-
-$env:PGPASSWORD = $PostgresPassword
-
-try {
-  $dbExists = & psql -U postgres -h localhost -tAc "SELECT 1 FROM pg_database WHERE datname='diploma';" 2>$null
-
-  if ($dbExists.Trim() -eq "1") {
-    Write-Host "Database 'diploma' already exists."
-  } else {
-    & createdb -U postgres -h localhost diploma
-    Write-Host "Database 'diploma' created."
-  }
-} catch {
-  Write-Warning "Could not auto-create database using psql/createdb."
-  Write-Warning "Open pgAdmin or psql and create database manually:"
-  Write-Warning "CREATE DATABASE diploma;"
-}
-
-# ------------------------------------------------------------
-# Write demo env values
-# ------------------------------------------------------------
-
-Write-Step "Writing demo API keys to env files"
-
-$BackendEnvPath = "$Root\backend\.env"
-$FrontendEnvPath = "$Root\frontend\.env.local"
-
-Add-OrUpdateEnvLine $BackendEnvPath "ADMIN_API_KEY" $AdminApiKey
-Add-OrUpdateEnvLine $BackendEnvPath "ISSUER_API_KEY" $IssuerApiKey
-Add-OrUpdateEnvLine $BackendEnvPath "DB_HOST" "localhost"
-Add-OrUpdateEnvLine $BackendEnvPath "DB_PORT" "5432"
-Add-OrUpdateEnvLine $BackendEnvPath "DB_USERNAME" "postgres"
-Add-OrUpdateEnvLine $BackendEnvPath "DB_PASSWORD" $PostgresPassword
-Add-OrUpdateEnvLine $BackendEnvPath "DB_NAME" "diploma"
-
-Add-OrUpdateEnvLine $FrontendEnvPath "VITE_API_BASE" "http://localhost:3000/api"
-Add-OrUpdateEnvLine $FrontendEnvPath "VITE_ADMIN_API_KEY" $AdminApiKey
-Add-OrUpdateEnvLine $FrontendEnvPath "VITE_ISSUER_API_KEY" $IssuerApiKey
-
-Write-Host "Updated backend env: $BackendEnvPath"
-Write-Host "Updated frontend env: $FrontendEnvPath"
-
-# Also expose values to current process and child processes.
-$env:ADMIN_API_KEY = $AdminApiKey
-$env:ISSUER_API_KEY = $IssuerApiKey
-$env:POSTGRES_PASSWORD = $PostgresPassword
-
-# ------------------------------------------------------------
-# Install dependencies
-# ------------------------------------------------------------
-
-Write-Step "Installing root dependencies"
-npm install
-
-Write-Step "Installing backend dependencies"
-Push-Location backend
-npm install
-Pop-Location
-
-Write-Step "Installing frontend dependencies"
-Push-Location frontend
-npm install
-Pop-Location
-
-# ------------------------------------------------------------
-# Start Hardhat node
-# ------------------------------------------------------------
-
-Write-Step "Starting Hardhat node in a new terminal"
-Start-NewTerminal "Hardhat node" "cd '$Root'; npm run node"
-
-Write-Host ""
-Write-Host "Waiting for Hardhat node on http://127.0.0.1:8545 ..." -ForegroundColor Yellow
-
-if (-not (Wait-HardhatRpc "http://127.0.0.1:8545" 40)) {
-  throw "Hardhat node did not become ready on http://127.0.0.1:8545"
-}
-
-Write-Host "Hardhat node is ready." -ForegroundColor Green
-
-# ------------------------------------------------------------
-# Deploy contracts + setup local env
-# ------------------------------------------------------------
-
-Write-Step "Deploying contracts, authorizing demo issuer, updating env files"
-
-npm run setup:local
-
-# After setup:local, re-apply API keys in case setup script rewrote env files.
-Add-OrUpdateEnvLine $BackendEnvPath "ADMIN_API_KEY" $AdminApiKey
-Add-OrUpdateEnvLine $BackendEnvPath "ISSUER_API_KEY" $IssuerApiKey
-Add-OrUpdateEnvLine $FrontendEnvPath "VITE_ADMIN_API_KEY" $AdminApiKey
-Add-OrUpdateEnvLine $FrontendEnvPath "VITE_ISSUER_API_KEY" $IssuerApiKey
-
-# ------------------------------------------------------------
-# Start backend
-# ------------------------------------------------------------
-
-Write-Step "Starting backend in a new terminal"
-Start-NewTerminal "NestJS backend" "cd '$Root\backend'; npm run start:dev"
-
-Write-Host ""
-Write-Host "Waiting for backend API docs on http://localhost:3000/api/docs ..." -ForegroundColor Yellow
-
-if (Wait-HttpGet "http://localhost:3000/api/docs" 40) {
-  Write-Host "Backend appears to be ready." -ForegroundColor Green
-} else {
-  Write-Warning "Backend did not respond on /api/docs within the wait time."
-  Write-Warning "Check the NestJS backend terminal for errors."
-}
-
-# ------------------------------------------------------------
-# Start frontend
-# ------------------------------------------------------------
-
-Write-Step "Starting frontend in a new terminal"
-Start-NewTerminal "Vite frontend" "cd '$Root\frontend'; npm run dev"
-
-# ------------------------------------------------------------
-# Optional pgAdmin
-# ------------------------------------------------------------
-
-if ($OpenPgAdmin) {
-  Write-Step "Opening pgAdmin if installed"
 
   $possiblePgAdminPaths = @(
     "$env:ProgramFiles\PostgreSQL\18\pgAdmin 4\bin\pgAdmin4.exe",
@@ -334,31 +173,140 @@ if ($OpenPgAdmin) {
   if ($pgAdminPath) {
     Start-Process $pgAdminPath
   } else {
-    Write-Warning "pgAdmin executable not found in common paths."
+    Write-Warning "pgAdmin executable not found."
   }
 }
 
-# ------------------------------------------------------------
-# Final info
-# ------------------------------------------------------------
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+if ((Split-Path -Leaf $ScriptDir) -eq "scripts") {
+  $Root = Split-Path -Parent $ScriptDir
+} else {
+  $Root = $ScriptDir
+}
+
+Set-Location $Root
+
+Write-Step "Project root: $Root"
+
+if (-not (Test-Path "$Root\package.json")) {
+  throw "package.json not found. Place this script in the project root or scripts folder."
+}
+
+if (-not (Test-Path "$Root\backend")) {
+  throw "backend folder not found."
+}
+
+if (-not (Test-Path "$Root\frontend")) {
+  throw "frontend folder not found."
+}
+
+Write-Step "Checking and installing prerequisites if needed"
+
+$PrerequisiteScript = "$Root\install-prerequisites.ps1"
+
+if (Test-Path $PrerequisiteScript) {
+  $preArgs = @()
+
+  if ($NoAutoInstallPrerequisites) {
+    $preArgs += "-NoInstall"
+  }
+
+  . $PrerequisiteScript @preArgs
+} else {
+  Write-Warning "install-prerequisites.ps1 not found. Skipping automatic prerequisite check."
+}
+
+Write-Step "Checking required commands"
+
+Require-Command "git" "Install Git for Windows, reopen PowerShell, then run this script again."
+Require-Command "node" "Install Node.js LTS, reopen PowerShell, then run this script again."
+Require-Command "npm" "Install Node.js LTS, reopen PowerShell, then run this script again."
+
+$env:POSTGRES_PASSWORD = $PostgresPassword
+$env:DB_PASSWORD = $PostgresPassword
+$env:ADMIN_API_KEY = $AdminApiKey
+$env:ISSUER_API_KEY = $IssuerApiKey
+
+Write-Step "Checking PostgreSQL"
+
+Add-PostgresToPath
+
+Require-Command "psql" "Install PostgreSQL or add the PostgreSQL bin folder to PATH."
+Require-Command "createdb" "Install PostgreSQL or add the PostgreSQL bin folder to PATH."
+
+Start-PostgresIfPossible $PostgresServiceName
+Ensure-Database $PostgresPassword
+
+Write-Step "Installing project dependencies"
+
+npm install
+
+Push-Location backend
+npm install
+Pop-Location
+
+Push-Location frontend
+npm install
+Pop-Location
+
+Write-Step "Starting Hardhat node"
+
+Start-NewTerminal "Hardhat node" "cd '$Root'; npm run node"
+
+Write-Host "Waiting for Hardhat RPC..." -ForegroundColor Yellow
+
+if (-not (Wait-HardhatRpc "http://127.0.0.1:8545" 40)) {
+  throw "Hardhat node did not become ready on http://127.0.0.1:8545"
+}
+
+Write-Host "Hardhat node is ready." -ForegroundColor Green
+
+Write-Step "Deploying contracts, authorizing demo issuer, and writing env files"
+
+npm run setup:local
+
+Write-Step "Starting backend"
+
+Start-NewTerminal "NestJS backend" "cd '$Root\backend'; npm run start:dev"
+
+Write-Host "Waiting for backend API docs..." -ForegroundColor Yellow
+
+if (Wait-HttpGet "http://localhost:3000/api/docs" 40) {
+  Write-Host "Backend is ready." -ForegroundColor Green
+} else {
+  Write-Warning "Backend did not respond on /api/docs. Check the backend terminal."
+}
+
+Write-Step "Starting frontend"
+
+Start-NewTerminal "Vite frontend" "cd '$Root\frontend'; npm run dev"
+
+Open-PgAdminIfRequested
 
 Write-Host ""
 Write-Host "All services are starting." -ForegroundColor Green
 Write-Host ""
-Write-Host "Frontend: http://localhost:5173"
+Write-Host "Frontend:         http://localhost:5173"
 Write-Host "Backend API docs: http://localhost:3000/api/docs"
-Write-Host "Hardhat RPC: http://127.0.0.1:8545"
+Write-Host "Hardhat RPC:      http://127.0.0.1:8545"
 Write-Host ""
-Write-Host "Demo data:"
-Write-Host "Admin API key: $AdminApiKey"
+Write-Host "Demo keys:"
+Write-Host "Admin API key:  $AdminApiKey"
 Write-Host "Issuer API key: $IssuerApiKey"
-Write-Host "Issuer wallet: 0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
-Write-Host "Holder wallet: 0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc"
+Write-Host ""
+Write-Host "Demo wallets:"
+Write-Host "Admin / Owner:       0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+Write-Host "University / Issuer: 0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
+Write-Host "Student / Holder:    0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc"
 Write-Host ""
 Write-Host "Recommended demo flow:"
-Write-Host "1. Admin page -> add issuer using Admin API key"
-Write-Host "2. University page -> enter Issuer API key -> issue credential"
-Write-Host "3. Student page -> view credential / generate proof"
-Write-Host "4. Verify page -> verify credential or proof"
-Write-Host "5. University page -> revoke credential using Issuer API key"
+Write-Host "1. Admin page      -> authorize issuer"
+Write-Host "2. University page -> issue credential"
+Write-Host "3. Student page    -> generate proof"
+Write-Host "4. Verify page     -> verify proof"
+Write-Host "5. University page -> revoke credential"
+Write-Host "6. Verify page     -> verify again after revocation"
+Write-Host ""
+Write-Host "If automatic prerequisite installation was blocked, install missing tools manually and run this script again."
 Write-Host ""

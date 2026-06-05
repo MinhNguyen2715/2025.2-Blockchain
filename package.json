@@ -7,15 +7,12 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "node": "hardhat node",
-
     "deploy:local": "hardhat run scripts/deployAll.js --network localhost",
-    "authorize:demo-issuer": "hardhat run scripts/authorizeDemoIssuer.js --network localhost",
-    "setup:local-env": "node scripts/setupLocalEnv.js",
-    "setup:local": "npm run deploy:local && npm run authorize:demo-issuer && npm run setup:local-env",
-
+    "authorize:local": "hardhat run scripts/authorizeDemoIssuer.js --network localhost",
+    "env:local": "node scripts/setupLocalEnv.js",
+    "setup:local": "npm run deploy:local && npm run authorize:local && npm run env:local",
     "demo": "hardhat run scripts/demoFlow.js --network localhost",
     "demo:merkle": "hardhat run scripts/demoMerkleProof.js --network localhost",
-
     "format": "prettier --write \"contracts/**/*.sol\" \"scripts/**/*.js\" \"test/**/*.js\""
   },
   "keywords": [],
