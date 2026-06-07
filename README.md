@@ -163,6 +163,17 @@ Run:
 ```
 The script will automatically check the required local tools and install missing prerequisites when possible. It also installs the project dependencies for the root project, backend, and frontend.
 
+If your local PostgreSQL password is different, pass it using the -PostgresPassword parameter:
+```
+.\run-local.ps1 -PostgresPassword "your_postgres_password"
+```
+Example:
+```
+.\run-local.ps1 -PostgresPassword "postgres"
+```
+
+
+
 If automatic installation is blocked or fails because of permissions, missing winget, Windows policy, or PostgreSQL setup requirements, install the missing tools manually and run the script again.
 
 After startup, open:
